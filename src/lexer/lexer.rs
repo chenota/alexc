@@ -1,9 +1,11 @@
+// Turn semicolon-separated list of tokens into rust list
 macro_rules! tlist {
     ($($r:literal, $t:path, $f:ident);*) => {
         [ $((concat!("^", $r), $t, $f)),* ]
     }
 }
 
+// Token type
 pub enum TokenType {
     LParen,
     RParen,
@@ -21,23 +23,29 @@ pub enum TokenType {
     Newline,
 }
 
+// Token value
 pub enum TokenValue {
     Integer(i64),
     String(String),
     Empty
 }
 
-pub type Position = (usize, usize); // row, col
+// Position token appears in in input (line, col)
+pub type Position = (usize, usize);
 
+// All three parts of token
 pub type Token = (TokenType, TokenValue, Position);
 
+// Function that generates token value
 pub type ValueGenerator = fn(&str) -> Option<TokenValue>;
 
+// Generator functions
 fn gen_none(_: &str) -> Option<TokenValue> { None }
 fn gen_empty(_: &str) -> Option<TokenValue> { Some(TokenValue::Empty) }
 fn gen_int(x: &str) -> Option<TokenValue> { Some(TokenValue::Integer(x.parse().unwrap())) }
 fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string())) }
 
+// Constant tokens list
 const TOKENS: [(&str, TokenType, ValueGenerator); 14] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
     r"\+", TokenType::Plus, gen_empty;
