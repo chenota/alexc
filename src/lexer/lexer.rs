@@ -14,6 +14,8 @@ macro_rules! tlist {
 pub enum TokenType {
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     Equal,
     Plus,
     Minus,
@@ -23,10 +25,18 @@ pub enum TokenType {
     Identifier,
     Integer,
     LetKw,
+    FunKw,
+    ReturnKw,
     Colon,
+    Comma,
     Whitespace,
     Newline,
     EOF,
+}
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 // Token value
@@ -52,17 +62,22 @@ fn gen_int(x: &str) -> Option<TokenValue> { Some(TokenValue::Integer(x.parse().u
 fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string())) }
 
 // Constant tokens list
-const TOKENS: [(&str, TokenType, ValueGenerator); 14] = tlist!(
+const TOKENS: [(&str, TokenType, ValueGenerator); 19] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
+    r"fun", TokenType::FunKw, gen_empty;
+    r"return", TokenType::ReturnKw, gen_empty;
     r"\+", TokenType::Plus, gen_empty;
     r"-", TokenType::Minus, gen_empty;
     r"\*", TokenType::Times, gen_empty;
     r"/", TokenType::Div, gen_empty;
     r"\(", TokenType::LParen, gen_empty;
     r"\)", TokenType::RParen, gen_empty;
+    r"{", TokenType::LBracket, gen_empty;
+    r"}", TokenType::RBracket, gen_empty;
     r"=", TokenType::Equal, gen_empty;
     r";", TokenType::Semi, gen_empty;
     r":", TokenType::Colon, gen_empty;
+    r",", TokenType::Comma, gen_empty;
     r"[0-9]+", TokenType::Integer, gen_int;
     r"[a-zA-Z][a-zA-Z0-9]*", TokenType::Identifier, gen_id;
     r"[\t\v\f\r ]", TokenType::Whitespace, gen_none;
