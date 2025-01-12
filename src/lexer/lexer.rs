@@ -10,7 +10,7 @@ macro_rules! tlist {
 }
 
 // Token type
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenType {
     LParen,
     RParen,
