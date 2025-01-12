@@ -155,11 +155,14 @@ impl Lexer {
         // Increment position
         self.pos += 1;
         // Peek token at previous position (or receive error)
-        let token = self.peek_token(self.pos - 1);
+        let token = self.peek_token_pos(self.pos - 1);
         // Return result
         return token
     }
-    pub fn peek_token(&mut self, pos: usize) -> Result<&Token, String> {
+    pub fn peek_token(&mut self) -> Result<&Token, String> {
+        self.peek_token_pos(self.pos)
+    }
+    fn peek_token_pos(&mut self, pos: usize) -> Result<&Token, String> {
         // If position isn't memoized, generate the next token
         if pos >= self.tokens.len() {
             let next_token = self.generator.next().unwrap()?;
