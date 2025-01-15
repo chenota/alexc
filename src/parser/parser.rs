@@ -6,7 +6,8 @@ pub type Function = (Ident, IdentList, StmtList);
 pub enum Statement {
     ExprStatement(Expression),
     ReturnStatement(Expression),
-    LetStmt(Ident, Option<Ident>, Expression)
+    LetStmt(TypedIdent, Expression),
+    AssignStmt(Ident, Expression),
 }
 
 pub enum Expression {
@@ -34,8 +35,10 @@ pub enum Literal {
 }
 
 pub type Ident = String;
+pub type TypedIdent = (String, Option<String>);
 
 pub type IdentList = Vec<Ident>;
+pub type TypedIdentList = Vec<TypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
 
@@ -56,6 +59,10 @@ impl Parser {
     // Invalid token error message
     fn invalid_token_err(&self) -> String {
         "Syntax Error: Invalid token ".to_string() + " at " + &self.row.to_string() + ":" + &self.col.to_string()
+    }
+    // Expected message
+    fn expected_err(&self, x: &str) -> String {
+        "Syntax Error: Expected ".to_string() + x + " at " + &self.row.to_string() + ":" + &self.col.to_string()
     }
     // Mark position
     pub fn mark(&self) -> usize {
@@ -140,7 +147,7 @@ impl Parser {
         // Extract ident
         let id = match self.expect_err(TokenType::Identifier)? {
             (_, TokenValue::String(s), _) => s.clone(),
-            _ => return Err(self.invalid_token_err())
+            _ => return Err(self.expected_err("identifier"))
         };
         // Expect open paren
         self.expect_err(TokenType::LParen)?;
@@ -158,7 +165,56 @@ impl Parser {
         Ok(Some((id, idlist, stmts)))
     }
     fn statement(&mut self) -> Result<Option<Statement>, String> {
-
+        // Mark position
+        let pos = self.mark();
+        // Skip to next next token for lookahead
+        self.tokenizer.get_token()?;
+        // Check if next is an equal sign (in case ... = ... if so)
+        if !self.expect(TokenType::Equal)?.is_none() {
+            // Expect an identifier
+            let id = match self.expect_err(TokenType::Identifier)? {
+                (_, TokenValue::String(s), _) => s.clone(),
+                _ => return Err(self.expected_err("identifier"))
+            };
+            // Expect an equal sign
+            self.expect_err(TokenType::Equal)?;
+            // Parse an expression
+            let ex = match self.expression()? {
+                Some(e) => e,
+                None => return Err(self.expected_err("expression"))
+            };
+            // Put together and return
+            return Ok(Some(Statement::AssignStmt(id, ex)))
+        };
+        // Reset position
+        self.reset(pos);
+        // Check for let token
+        if !self.expect(TokenType::LetKw)?.is_none() {
+            // Parse a typed identifier
+            let tid = match self.typed_ident()? {
+                Some(x) => x,
+                None => return Err(self.expected_err("typed identifier"))
+            };
+            // Expect an equal sign
+            self.expect_err(TokenType::Equal)?;
+            // Parse an expression
+            let e = match self.expression()? {
+                Some(e) => e,
+                None => return Err(self.expected_err("expression"))
+            };
+            // Put together and return
+            return Ok(Some(Statement::LetStmt(tid, e)))
+        };
+        // Attempt to parse expression
+        match self.expression()? {
+            Some(e) => Ok(Some(Statement::ExprStatement(e))),
+            None => {
+                // Reset position
+                self.reset(pos);
+                // Return None
+                Ok(None)
+            }
+        }
     }
     fn expression(&mut self) -> Result<Option<Expression>, String> {
 
@@ -195,5 +251,31 @@ impl Parser {
         };
         // Return the list
         Ok(idents)
+    }
+    fn typed_ident(&mut self) -> Result<Option<TypedIdent>, String> {
+        // Mark position
+        let pos = self.mark();
+        // Expect an identifier, return none if not found
+        let id = match self.expect(TokenType::Identifier)? {
+            Some((_, TokenValue::String(s), _)) => s.clone(),
+            _ => { self.reset(pos); return Ok(None) }
+        };
+        // Expect a colon
+        let t = match self.expect(TokenType::Colon)? {
+            // Found colon, parse type name
+            Some(_) => {
+                // Expect err an identifier following the colon
+                let t_name = match self.expect_err(TokenType::Identifier)? {
+                    (_, TokenValue::String(s), _) => s.clone(),
+                    _ => return Err(self.expected_err("identifier"))
+                };
+                // Some of type name
+                Some(t_name)
+            },
+            // No colon, no type name provided
+            _ => None
+        };
+        // Put together
+        Ok(Some((id, t)))
     }
 }
