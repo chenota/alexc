@@ -18,9 +18,12 @@ pub enum Expression {
     CallExpression(Ident, ExprList)
 }
 
+#[derive(Clone)]
 pub enum Uop {
     NegUop
 }
+
+#[derive(Clone)]
 pub enum Bop {
     PlusBop,
     MinusBop,
@@ -41,6 +44,16 @@ pub type IdentList = Vec<Ident>;
 pub type TypedIdentList = Vec<TypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
+
+const ARITH_PLUS: [(TokenType, Bop); 2] = [
+    (TokenType::Plus, Bop::PlusBop),
+    (TokenType::Minus, Bop::MinusBop),
+];
+
+const ARITH_TIMES: [(TokenType, Bop); 2] = [
+    (TokenType::Times, Bop::TimesBop),
+    (TokenType::Div, Bop::DivBop),
+];
 
 pub struct Parser {
     tokenizer: Lexer,
@@ -216,7 +229,52 @@ impl Parser {
             }
         }
     }
+    fn parse_bop_expr(&mut self, f: fn(&mut Self) -> Result<Option<Expression>, String>, bops: &[(TokenType, Bop)]) -> Result<Option<Expression>, String> {
+        // Parse expression
+        let head = match f(self)? {
+            Some(e) => e,
+            None => return Ok(None)
+        };
+        // Create list of (bop, expr) pairs
+        let mut elist = Vec::new();
+        // Consume <bop>, <expression> pairs
+        loop {
+            // Check for one of the bops
+            match bops.iter().fold(
+                None, 
+                |acc, bop | {
+                    match acc { 
+                        Some(_) => acc, 
+                        None => match self.expect(bop.0.clone()) { Ok(Some(_)) => Some(bop.1.clone()), _ => None }
+                    }
+                }
+            ) {
+                Some(b) => {
+                    // Consume addtl expression
+                    let e1 = match f(self)? {
+                        Some(e) => e,
+                        None => return Err(self.expected_err("expression"))
+                    };
+                    // Push to list
+                    elist.push((b, e1))
+                },
+                // Nothing found, stop
+                None => break
+            }
+        };
+        // Create left-associative list and return
+        Ok(Some(elist.drain(..).fold(
+            head,
+            |acc, bop| Expression::BopExpression(bop.0, Box::new(bop.1), Box::new(acc))
+        )))
+    }
     fn expression(&mut self) -> Result<Option<Expression>, String> {
+        self.parse_bop_expr(Self::e1, &ARITH_PLUS)
+    }
+    fn e1(&mut self) -> Result<Option<Expression>, String> {
+        self.parse_bop_expr(Self::value, &ARITH_TIMES)
+    }
+    fn value(&mut self) -> Result<Option<Expression>, String> {
 
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {
