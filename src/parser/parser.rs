@@ -13,7 +13,7 @@ pub enum Statement {
 pub enum Expression {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),
-    LiteralExpression(Literal),
+    IntegerLiteral(i64),
     VariableExpression(Ident),
     CallExpression(Ident, ExprList)
 }
@@ -29,12 +29,6 @@ pub enum Bop {
     MinusBop,
     TimesBop,
     DivBop
-}
-pub enum Literal {
-    Integer(i64),
-    String(String),
-    Boolean(bool),
-    Character(u8)
 }
 
 pub type Ident = String;
@@ -275,7 +269,24 @@ impl Parser {
         self.parse_bop_expr(Self::value, &ARITH_TIMES)
     }
     fn value(&mut self) -> Result<Option<Expression>, String> {
-
+        // Check for parenthesis
+        if self.expect(TokenType::LParen)?.is_some() {
+            // Parse expression
+            let e = match self.expression()? {
+                Some(e) => e,
+                None => return Err(self.expected_err("Expression"))
+            };
+            // Expect rparen
+            self.expect_err(TokenType::RParen)?;
+            // Return e
+            return Ok(Some(e));
+        };
+        // Check for integer literal
+        match self.expect(TokenType::Integer)? {
+            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntegerLiteral(x.clone()))),
+            _ => return Err(self.invalid_token_err())
+        };
+        Ok(None)
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {
         // Statements
