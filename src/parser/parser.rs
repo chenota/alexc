@@ -1,7 +1,7 @@
 use crate::lexer::lexer::*;
 
 pub type Program = (Vec<Function>, Vec<Statement>);
-pub type Function = (Ident, IdentList, StmtList);
+pub type Function = (Ident, TypedIdentList, StmtList);
 
 pub enum Statement {
     ExprStatement(Expression),
@@ -152,7 +152,7 @@ impl Parser {
         // Expect open paren
         self.expect_err(TokenType::LParen)?;
         // Parse identifier list
-        let idlist = self.identlist()?;
+        let idlist = self.typed_identlist()?;
         // Expect closing paren
         self.expect_err(TokenType::RParen)?;
         // Expect opening bracket
@@ -233,25 +233,6 @@ impl Parser {
         // Return
         Ok(stmts)
     }
-    fn identlist(&mut self) -> Result<IdentList, String> {
-        // Identifiers
-        let mut idents = Vec::new();
-        // Loop
-        loop {
-            // Attempt to parse an identifier
-            match self.expect(TokenType::Identifier)? {
-                Some((_, TokenValue::String(s), _)) => {
-                    // Push found identifier string
-                    idents.push(s.clone());
-                    // Break if no comma
-                    if self.expect(TokenType::Comma)?.is_none() { break }
-                },
-                _ => break
-            };
-        };
-        // Return the list
-        Ok(idents)
-    }
     fn typed_ident(&mut self) -> Result<Option<TypedIdent>, String> {
         // Mark position
         let pos = self.mark();
@@ -277,5 +258,24 @@ impl Parser {
         };
         // Put together
         Ok(Some((id, t)))
+    }
+    fn typed_identlist(&mut self) -> Result<TypedIdentList, String> {
+        // Identifiers
+        let mut idents = Vec::new();
+        // Loop
+        loop {
+            // Attempt to parse an identifier
+            match self.typed_ident()? {
+                Some(tid) => {
+                    // Push found identifier string
+                    idents.push(tid);
+                    // Break if no comma
+                    if self.expect(TokenType::Comma)?.is_none() { break }
+                },
+                _ => break
+            };
+        };
+        // Return the list
+        Ok(idents)
     }
 }
