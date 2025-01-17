@@ -109,10 +109,10 @@ mod parser_tests {
         let x = p.parse().unwrap();
         // Check values
         match &x.0[0] {
-            (name, params, body) => {
+            (name, params, ret_type, _) => {
                 assert_eq!(name, "main");
                 assert_eq!(params.len(), 0);
-                
+                assert_eq!(ret_type, "i64");
             }
             _ => panic!()
         }
