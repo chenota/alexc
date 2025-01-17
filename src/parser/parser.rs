@@ -120,7 +120,7 @@ impl Parser {
         // Return result
         Ok(result)
     }
-    fn program(&mut self) -> Result<Program, String> {
+    pub fn program(&mut self) -> Result<Program, String> {
         // Vectors to hold parts of the program
         let mut fns = Vec::new();
         let mut stmts = Vec::new();
