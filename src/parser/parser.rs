@@ -207,7 +207,7 @@ impl Parser {
         // Reset position
         self.reset(pos);
         // Check for let token
-        if !self.expect(TokenType::LetKw)?.is_none() {
+        if self.expect(TokenType::LetKw)?.is_some() {
             // Parse a typed identifier
             let tid = match self.typed_ident()? {
                 Some(x) => x,
@@ -224,6 +224,19 @@ impl Parser {
             self.expect_err(TokenType::Semi)?;
             // Put together and return
             return Ok(Some(Statement::LetStmt(tid, e)))
+        };
+        // Check for return keyword
+        if self.expect(TokenType::ReturnKw)?.is_some() {
+            // Parse an expression
+            match self.expression()? {
+                Some(e) => {
+                    // Expect a semicolon
+                    self.expect_err(TokenType::Semi)?;
+                    // Return
+                    return Ok(Some(Statement::ReturnStatement(e)))
+                },
+                None => return Err(self.expected_err("Expression"))
+            }
         };
         // Attempt to parse expression
         match self.expression()? {
