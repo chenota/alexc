@@ -99,4 +99,24 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn fun1() {
+        // Stream
+        let s = "fun main(): i64 { return 0; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.0[0] {
+            (name, params, body) => {
+                assert_eq!(name, "main");
+                assert_eq!(params.len(), 0);
+                
+            }
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
 }

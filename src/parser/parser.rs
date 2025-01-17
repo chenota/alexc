@@ -1,7 +1,7 @@
 use crate::lexer::lexer::*;
 
 pub type Program = (Vec<Function>, Vec<Statement>);
-pub type Function = (Ident, TypedIdentList, StmtList);
+pub type Function = (Ident, TypedIdentList, String, StmtList);
 
 pub enum Statement {
     ExprStatement(Expression),
@@ -162,6 +162,13 @@ impl Parser {
         let idlist = self.typed_identlist()?;
         // Expect closing paren
         self.expect_err(TokenType::RParen)?;
+        // Expect colon
+        self.expect_err(TokenType::Colon)?;
+        // Expect ident
+        let ret_type = match self.expect_err(TokenType::Identifier)? {
+            (_, TokenValue::String(s), _) => s.clone(),
+            _ => self.invalid_token_err()
+        };
         // Expect opening bracket
         self.expect_err(TokenType::LBracket)?;
         // Parse a statement list
@@ -169,7 +176,7 @@ impl Parser {
         // Expect closing bracket
         self.expect_err(TokenType::RBracket)?;
         // Return
-        Ok(Some((id, idlist, stmts)))
+        Ok(Some((id, idlist, ret_type, stmts)))
     }
     fn statement(&mut self) -> Result<Option<Statement>, String> {
         // Mark position
