@@ -72,15 +72,15 @@ impl Parser {
         "Syntax Error: Expected ".to_string() + x + " at " + &self.row.to_string() + ":" + &self.col.to_string()
     }
     // Mark position
-    pub fn mark(&self) -> usize {
+    fn mark(&self) -> usize {
         self.tokenizer.mark()
     }
     // Reset to position
-    pub fn reset(&mut self, pos: usize) {
+    fn reset(&mut self, pos: usize) {
         self.tokenizer.reset(pos)
     }
     // Expect a token
-    pub fn expect(&mut self, arg: TokenType) -> Result<Option<&Token>, String> {
+    fn expect(&mut self, arg: TokenType) -> Result<Option<&Token>, String> {
         // Peek current token
         let token = self.tokenizer.peek_token()?;
         // If token matches, return some
@@ -95,7 +95,7 @@ impl Parser {
         Ok(None)
     }
     // Expect a token
-    pub fn expect_err(&mut self, arg: TokenType) -> Result<&Token, String> {
+    fn expect_err(&mut self, arg: TokenType) -> Result<&Token, String> {
         // Peek current token
         let token = self.tokenizer.peek_token()?;
         // If token matches, return some
@@ -110,7 +110,7 @@ impl Parser {
         Err("Syntax Error: Expected token ".to_string() + &arg.to_string() + " at " + &self.row.to_string() + ":" + &self.col.to_string())
     }
     // Start parsing
-    pub fn start(&mut self) -> Result<Program, String> {
+    pub fn parse(&mut self) -> Result<Program, String> {
         // Reset pos
         self.reset(0);
         // Parse program
@@ -120,7 +120,7 @@ impl Parser {
         // Return result
         Ok(result)
     }
-    pub fn program(&mut self) -> Result<Program, String> {
+    fn program(&mut self) -> Result<Program, String> {
         // Vectors to hold parts of the program
         let mut fns = Vec::new();
         let mut stmts = Vec::new();
