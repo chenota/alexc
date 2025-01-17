@@ -14,6 +14,7 @@ pub enum Expression {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),
     IntLiteral(usize),
+    CharLiteral(char),
     VariableExpression(Ident),
     CallExpression(Ident, ExprList)
 }
@@ -46,6 +47,7 @@ pub enum MonoType {
 
 pub enum TypeName {
     Int64,
+    Char
 }
 
 const ARITH_PLUS: [(TokenType, Bop); 2] = [
@@ -328,6 +330,11 @@ impl Parser {
             Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(x.clone()))),
             _ => ()
         };
+        // Check for character literal
+        match self.expect(TokenType::Character)? {
+            Some((_, TokenValue::Char(x), _)) => return Ok(Some(Expression::CharLiteral(x.clone()))),
+            _ => ()
+        };
         Ok(None)
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {
@@ -392,6 +399,7 @@ impl Parser {
             Some((_, TokenValue::String(s), _)) => {
                 match s.as_str() {
                     "i64" => TypeName::Int64,
+                    "char" => TypeName::Char,
                     _ => return Err(self.expected_err("Type"))
                 }
             },

@@ -31,6 +31,7 @@ pub enum TokenType {
     Comma,
     Whitespace,
     Newline,
+    Character,
     EOF,
 }
 impl std::fmt::Display for TokenType {
@@ -43,6 +44,7 @@ impl std::fmt::Display for TokenType {
 pub enum TokenValue {
     Integer(usize),
     String(String),
+    Char(char),
     Empty
 }
 
@@ -60,9 +62,10 @@ fn gen_none(_: &str) -> Option<TokenValue> { None }
 fn gen_empty(_: &str) -> Option<TokenValue> { Some(TokenValue::Empty) }
 fn gen_int(x: &str) -> Option<TokenValue> { Some(TokenValue::Integer(x.parse().unwrap())) }
 fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string())) }
+fn gen_char(x: &str) -> Option<TokenValue> { Some(TokenValue::Char(x.chars().nth(1).unwrap())) }
 
 // Constant tokens list
-const TOKENS: [(&str, TokenType, ValueGenerator); 19] = tlist!(
+const TOKENS: [(&str, TokenType, ValueGenerator); 20] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
     r"fun", TokenType::FunKw, gen_empty;
     r"return", TokenType::ReturnKw, gen_empty;
@@ -78,6 +81,7 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 19] = tlist!(
     r";", TokenType::Semi, gen_empty;
     r":", TokenType::Colon, gen_empty;
     r",", TokenType::Comma, gen_empty;
+    r"'.'", TokenType::Character, gen_char;
     r"[0-9]+", TokenType::Integer, gen_int;
     r"[a-zA-Z][a-zA-Z0-9]*", TokenType::Identifier, gen_id;
     r"[\t\v\f\r ]", TokenType::Whitespace, gen_none;
