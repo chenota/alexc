@@ -72,8 +72,8 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 19] = tlist!(
     r"/", TokenType::Div, gen_empty;
     r"\(", TokenType::LParen, gen_empty;
     r"\)", TokenType::RParen, gen_empty;
-    r"{", TokenType::LBracket, gen_empty;
-    r"}", TokenType::RBracket, gen_empty;
+    r"\{", TokenType::LBracket, gen_empty;
+    r"\}", TokenType::RBracket, gen_empty;
     r"=", TokenType::Equal, gen_empty;
     r";", TokenType::Semi, gen_empty;
     r":", TokenType::Colon, gen_empty;

@@ -281,10 +281,15 @@ impl Parser {
             // Return e
             return Ok(Some(e));
         };
+        // Check for ident
+        match self.expect(TokenType::Identifier)? {
+            Some((_, TokenValue::String(x), _)) => return Ok(Some(Expression::VariableExpression(x.clone()))),
+            _ => ()
+        };
         // Check for integer literal
         match self.expect(TokenType::Integer)? {
             Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntegerLiteral(x.clone()))),
-            _ => return Err(self.invalid_token_err())
+            _ => ()
         };
         Ok(None)
     }

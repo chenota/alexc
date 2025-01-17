@@ -6,7 +6,7 @@ mod parser_tests {
     #[test]
     fn var1() {
         // Stream
-        let s = "x".to_string();
+        let s = "x;".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
