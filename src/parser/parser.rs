@@ -209,12 +209,19 @@ impl Parser {
                 Some(e) => e,
                 None => return Err(self.expected_err("expression"))
             };
+            // Expect a semicolon
+            self.expect_err(TokenType::Semi)?;
             // Put together and return
             return Ok(Some(Statement::LetStmt(tid, e)))
         };
         // Attempt to parse expression
         match self.expression()? {
-            Some(e) => Ok(Some(Statement::ExprStatement(e))),
+            Some(e) => {
+                // Expect a semicolon
+                self.expect_err(TokenType::Semi)?;
+                // Return
+                Ok(Some(Statement::ExprStatement(e)))
+            },
             None => {
                 // Reset position
                 self.reset(pos);
