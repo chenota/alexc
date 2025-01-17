@@ -23,7 +23,7 @@ mod tgen_tests {
         // Stream
         let s = "X y12 z0Z".to_string();
         // Token generator
-        let mut t = TokenGen::new(s);
+        let t = TokenGen::new(s);
         // Collect tokens
         let seq = t
             .take(3)
@@ -59,7 +59,7 @@ mod tgen_tests {
         // Stream
         let s = "-12-12".to_string();
         // Token generator
-        let mut t = TokenGen::new(s);
+        let t = TokenGen::new(s);
         // Collect tokens
         let seq = t
             .take(5)
@@ -79,7 +79,7 @@ mod tgen_tests {
         // Stream
         let s = "let x = 5;".to_string();
         // Token generator
-        let mut t = TokenGen::new(s);
+        let t = TokenGen::new(s);
         // Collect tokens
         let seq = t
             .take(6)
