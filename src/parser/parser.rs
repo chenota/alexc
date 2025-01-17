@@ -177,7 +177,9 @@ impl Parser {
         // Skip to next next token for lookahead
         self.tokenizer.get_token()?;
         // Check if next is an equal sign (in case ... = ... if so)
-        if !self.expect(TokenType::Equal)?.is_none() {
+        if self.expect(TokenType::Equal)?.is_some() {
+            // Reset pos
+            self.reset(pos);
             // Expect an identifier
             let id = match self.expect_err(TokenType::Identifier)? {
                 (_, TokenValue::String(s), _) => s.clone(),
@@ -190,6 +192,8 @@ impl Parser {
                 Some(e) => e,
                 None => return Err(self.expected_err("expression"))
             };
+            // Expect a semicolon
+            self.expect_err(TokenType::Semi)?;
             // Put together and return
             return Ok(Some(Statement::AssignStmt(id, ex)))
         };
