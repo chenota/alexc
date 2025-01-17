@@ -68,6 +68,38 @@ mod parser_tests {
         ()
     }
     #[test]
+    fn bop_prec1() {
+        // Stream
+        let s = "1 + 2 * 3;".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn bop_prec2() {
+        // Stream
+        let s = "2 * 3 + 1;".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
     fn let_stmt() {
         // Stream
         let s = "let x = 0;".to_string();
