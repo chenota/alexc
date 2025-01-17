@@ -1,7 +1,7 @@
 use crate::lexer::lexer::*;
 
 pub type Program = (Vec<Function>, Vec<Statement>);
-pub type Function = (Ident, TypedIdentList, String, StmtList);
+pub type Function = (Ident, TypedIdentList, MonoType, StmtList);
 
 pub enum Statement {
     ExprStatement(Expression),
@@ -32,12 +32,21 @@ pub enum Bop {
 }
 
 pub type Ident = String;
-pub type TypedIdent = (String, Option<String>);
+pub type TypedIdent = (String, Option<MonoType>);
 
 pub type IdentList = Vec<Ident>;
 pub type TypedIdentList = Vec<TypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
+
+pub enum MonoType {
+    Variable(usize),
+    Function(TypeName, Vec<MonoType>)
+}
+
+pub enum TypeName {
+    Int64,
+}
 
 const ARITH_PLUS: [(TokenType, Bop); 2] = [
     (TokenType::Plus, Bop::PlusBop),
@@ -165,10 +174,7 @@ impl Parser {
         // Expect colon
         self.expect_err(TokenType::Colon)?;
         // Expect ident
-        let ret_type = match self.expect_err(TokenType::Identifier)? {
-            (_, TokenValue::String(s), _) => s.clone(),
-            _ => self.invalid_token_err()
-        };
+        let ret_type = self.parse_type()?;
         // Expect opening bracket
         self.expect_err(TokenType::LBracket)?;
         // Parse a statement list
@@ -351,10 +357,7 @@ impl Parser {
             // Found colon, parse type name
             Some(_) => {
                 // Expect err an identifier following the colon
-                let t_name = match self.expect_err(TokenType::Identifier)? {
-                    (_, TokenValue::String(s), _) => s.clone(),
-                    _ => return Err(self.expected_err("identifier"))
-                };
+                let t_name = self.parse_type()?;
                 // Some of type name
                 Some(t_name)
             },
@@ -382,5 +385,19 @@ impl Parser {
         };
         // Return the list
         Ok(idents)
+    }
+    fn parse_type(&mut self) -> Result<MonoType, String> {
+        // Check for identifier
+        let first = match self.expect(TokenType::Identifier)? {
+            Some((_, TokenValue::String(s), _)) => {
+                match s.as_str() {
+                    "i64" => TypeName::Int64,
+                    _ => return Err(self.expected_err("Type"))
+                }
+            },
+            _ => return Err(self.expected_err("Type"))
+        };
+        // Return monotype
+        Ok(MonoType::Function(first, Vec::new()))
     }
 }

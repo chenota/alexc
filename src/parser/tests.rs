@@ -112,9 +112,11 @@ mod parser_tests {
             (name, params, ret_type, _) => {
                 assert_eq!(name, "main");
                 assert_eq!(params.len(), 0);
-                assert_eq!(ret_type, "i64");
+                match ret_type {
+                    MonoType::Function(TypeName::Int64, _) => (),
+                    _ => panic!()
+                }
             }
-            _ => panic!()
         }
         // Return
         ()
