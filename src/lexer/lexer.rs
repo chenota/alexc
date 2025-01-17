@@ -41,7 +41,7 @@ impl std::fmt::Display for TokenType {
 
 // Token value
 pub enum TokenValue {
-    Integer(i64),
+    Integer(usize),
     String(String),
     Empty
 }

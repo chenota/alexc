@@ -29,7 +29,7 @@ mod parser_tests {
         let x = p.parse().unwrap();
         // Check values
         match &x.1[0] {
-            Statement::ExprStatement(Expression::IntegerLiteral(v)) => assert_eq!(*v, 100),
+            Statement::ExprStatement(Expression::IntLiteral(v)) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return
@@ -45,7 +45,7 @@ mod parser_tests {
         let x = p.parse().unwrap();
         // Check values
         match &x.1[0] {
-            Statement::ExprStatement(Expression::IntegerLiteral(v)) => assert_eq!(*v, 100),
+            Statement::ExprStatement(Expression::IntLiteral(v)) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return

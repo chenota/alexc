@@ -13,7 +13,7 @@ pub enum Statement {
 pub enum Expression {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),
-    IntegerLiteral(i64),
+    IntLiteral(usize),
     VariableExpression(Ident),
     CallExpression(Ident, ExprList)
 }
@@ -325,7 +325,7 @@ impl Parser {
         };
         // Check for integer literal
         match self.expect(TokenType::Integer)? {
-            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntegerLiteral(x.clone()))),
+            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(x.clone()))),
             _ => ()
         };
         Ok(None)
