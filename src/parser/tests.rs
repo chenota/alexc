@@ -169,4 +169,42 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn call1() {
+        // Stream
+        let s = "f();".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::CallExpression(s, el)) => {
+                assert_eq!(s, "f");
+                assert_eq!(el.len(), 0);
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn call2() {
+        // Stream
+        let s = "g(1, 2, 3);".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::CallExpression(s, el)) => {
+                assert_eq!(s, "g");
+                assert_eq!(el.len(), 3);
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
 }
