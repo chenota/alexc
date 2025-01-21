@@ -15,12 +15,12 @@ pub enum TypeName {
 pub type Context = HashMap<usize, MonoType>;
 pub type Substitution = HashMap<usize, MonoType>;
 
-pub trait Apply {
+pub trait DoesSub {
     fn applym(&self, m: &MonoType) -> MonoType;
     fn applyc(&self, c: &Context) -> Context;
 }
 
-impl Apply for Substitution {
+impl DoesSub for Substitution {
     fn applym(&self, m: &MonoType) -> MonoType {
         match m {
             MonoType::Variable(x) => match self.get(x) {
