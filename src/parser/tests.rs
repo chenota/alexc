@@ -2,6 +2,7 @@
 
 mod parser_tests {
     use crate::parser::parser::*;
+    use crate::inference::inference::*;
 
     #[test]
     fn var1() {

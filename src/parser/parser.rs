@@ -1,4 +1,5 @@
 use crate::lexer::lexer::*;
+use crate::inference::inference::*;
 
 pub type Program = (Vec<Function>, Vec<Statement>);
 pub type Function = (Ident, TypedIdentList, MonoType, StmtList);
@@ -39,16 +40,6 @@ pub type IdentList = Vec<Ident>;
 pub type TypedIdentList = Vec<TypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
-
-pub enum MonoType {
-    Variable(usize),
-    Function(TypeName, Vec<MonoType>)
-}
-
-pub enum TypeName {
-    Int64,
-    Char
-}
 
 const ARITH_PLUS: [(TokenType, Bop); 2] = [
     (TokenType::Plus, Bop::PlusBop),
