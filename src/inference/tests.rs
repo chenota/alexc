@@ -56,12 +56,12 @@ mod inference_tests {
         // Create substitution
         let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
-        let t = app!(TypeName::Char => var!(0), var!(1));
+        let t = app!(TypeName::Tuple => var!(0), var!(1));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
         match t_new {
-            MonoType::Application(TypeName::Char, v) => {
+            MonoType::Application(TypeName::Tuple, v) => {
                 assert_eq!(v.len(), 2);
                 assert_eq!(v[0], MonoType::Variable(1));
                 assert_eq!(v[1], MonoType::Variable(2));
@@ -76,12 +76,12 @@ mod inference_tests {
         // Create substitution
         let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
-        let t = app!(TypeName::Char => var!(1), var!(0));
+        let t = app!(TypeName::Tuple => var!(1), var!(0));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
         match t_new {
-            MonoType::Application(TypeName::Char, v) => {
+            MonoType::Application(TypeName::Tuple, v) => {
                 assert_eq!(v.len(), 2);
                 assert_eq!(v[0], MonoType::Variable(2));
                 assert_eq!(v[1], MonoType::Variable(1));
@@ -96,12 +96,12 @@ mod inference_tests {
         // Create substitution
         let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
-        let t = app!(TypeName::Char => var!(1), var!(3));
+        let t = app!(TypeName::Tuple => var!(1), var!(3));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
         match t_new {
-            MonoType::Application(TypeName::Char, v) => {
+            MonoType::Application(TypeName::Tuple, v) => {
                 assert_eq!(v.len(), 2);
                 assert_eq!(v[0], MonoType::Variable(2));
                 assert_eq!(v[1], MonoType::Variable(3));
@@ -116,15 +116,15 @@ mod inference_tests {
         // Create substitution
         let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
-        let t = app!(TypeName::Char => app!(TypeName::Int64 => var!(0)));
+        let t = app!(TypeName::Tuple => app!(TypeName::Tuple => var!(0)));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
         match t_new {
-            MonoType::Application(TypeName::Char, v1) => {
+            MonoType::Application(TypeName::Tuple, v1) => {
                 assert_eq!(v1.len(), 1);
                 match &v1[0] {
-                    MonoType::Application(TypeName::Int64, v2) => {
+                    MonoType::Application(TypeName::Tuple, v2) => {
                         assert_eq!(v2.len(), 1);
                         assert_eq!(v2[0], MonoType::Variable(1))
                     },
@@ -156,14 +156,14 @@ mod inference_tests {
         // Create substitution 1
         let s1 = sub![0 => var!(1)];
         // Create substitution 2
-        let s2 = sub![2 => app!(TypeName::Char => var!(0))];
+        let s2 = sub![2 => app!(TypeName::Tuple => var!(0))];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check
         assert_eq!(s3.len(), 2);
         assert_eq!(*s3.get(&0).unwrap(), MonoType::Variable(1));
         match s3.get(&2).unwrap() {
-            MonoType::Application(TypeName::Char, v) => {
+            MonoType::Application(TypeName::Tuple, v) => {
                 assert_eq!(v.len(), 1);
                 assert_eq!(v[0], MonoType::Variable(1));
             },
@@ -196,6 +196,61 @@ mod inference_tests {
         assert_eq!(v1, MonoType::Variable(0));
         assert_eq!(v2, MonoType::Variable(1));
         assert_eq!(v3, MonoType::Variable(2));
+        // Return
+        ()
+    }
+    #[test]
+    fn unif1() {
+        // Types to unify
+        let t1 = app!(TypeName::Tuple => var!(0), var!(1));
+        let t2 = app!(TypeName::Tuple => app!(TypeName::Char), app!(TypeName::Int64));
+        // Unify
+        let s = t1.unify(&t2).unwrap();
+        // Check
+        assert_eq!(*s.get(&0).unwrap(), app!(TypeName::Char));
+        assert_eq!(*s.get(&1).unwrap(), app!(TypeName::Int64));
+        // Return
+        ()
+    }
+    #[test]
+    fn unif2() {
+        // Types to unify
+        let t1 = var!(0);
+        let t2 = app!(TypeName::Tuple => app!(TypeName::Char), app!(TypeName::Int64));
+        // Unify
+        let s = t1.unify(&t2).unwrap();
+        // Check
+        assert_eq!(*s.get(&0).unwrap(), app!(TypeName::Tuple => app!(TypeName::Char), app!(TypeName::Int64)));
+        // Return
+        ()
+    }
+    #[test]
+    fn unif3() {
+        // Types to unify
+        let t1 = app!(TypeName::Char);
+        let t2 = app!(TypeName::Int64);
+        // Unify and assert is error
+        assert!(t1.unify(&t2).is_err());
+        // Return
+        ()
+    }
+    #[test]
+    fn unif4() {
+        // Types to unify
+        let t1 = app!(TypeName::Tuple => app!(TypeName::Int64), app!(TypeName::Char));
+        let t2 = app!(TypeName::Tuple => app!(TypeName::Char), app!(TypeName::Int64));
+        // Unify and assert is error
+        assert!(t1.unify(&t2).is_err());
+        // Return
+        ()
+    }
+    #[test]
+    fn unif5() {
+        // Types to unify
+        let t1 = var!(0);
+        let t2 = app!(TypeName::Tuple => var!(0), var!(0));
+        // Unify and assert is error
+        assert!(t1.unify(&t2).is_err());
         // Return
         ()
     }
