@@ -6,7 +6,7 @@ mod inference_tests {
     #[test]
     fn subm1() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = var!(0);
         // Apply substitution
@@ -22,7 +22,7 @@ mod inference_tests {
     #[test]
     fn subm2() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = var!(1);
         // Apply substitution
@@ -38,7 +38,7 @@ mod inference_tests {
     #[test]
     fn subm3() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = var!(3);
         // Apply substitution
@@ -54,7 +54,7 @@ mod inference_tests {
     #[test]
     fn subf1() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = app!(TypeName::Char => var!(0), var!(1));
         // Apply substitution
@@ -74,7 +74,7 @@ mod inference_tests {
     #[test]
     fn subf2() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = app!(TypeName::Char => var!(1), var!(0));
         // Apply substitution
@@ -94,7 +94,7 @@ mod inference_tests {
     #[test]
     fn subf3() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = app!(TypeName::Char => var!(1), var!(3));
         // Apply substitution
@@ -114,7 +114,7 @@ mod inference_tests {
     #[test]
     fn subfnested() {
         // Create substitution
-        let s = sub![0 -> var!(1), 1 -> var!(2)];
+        let s = sub![0 => var!(1), 1 => var!(2)];
         // Type to try on
         let t = app!(TypeName::Char => app!(TypeName::Int64 => var!(0)));
         // Apply substitution
@@ -139,9 +139,9 @@ mod inference_tests {
     #[test]
     fn combine1() {
         // Create substitution 1
-        let s1 = sub![1 -> var!(2)];
+        let s1 = sub![1 => var!(2)];
         // Create substitution 2
-        let s2 = sub![0 -> var!(1)];
+        let s2 = sub![0 => var!(1)];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check
@@ -154,9 +154,9 @@ mod inference_tests {
     #[test]
     fn combine2() {
         // Create substitution 1
-        let s1 = sub![0 -> var!(1)];
+        let s1 = sub![0 => var!(1)];
         // Create substitution 2
-        let s2 = sub![2 -> app!(TypeName::Char => var!(0))];
+        let s2 = sub![2 => app!(TypeName::Char => var!(0))];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check
@@ -175,9 +175,9 @@ mod inference_tests {
     #[test]
     fn combine3() {
         // Create substitution 1
-        let s1 = sub![0 -> var!(2)];
+        let s1 = sub![0 => var!(2)];
         // Create substitution 2
-        let s2 = sub![0 -> var!(1)];
+        let s2 = sub![0 => var!(1)];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check

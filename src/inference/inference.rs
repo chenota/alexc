@@ -5,11 +5,11 @@ macro_rules! sub {
     [] => {
         Substitution::new()
     };
-    [$($l:literal -> $e:expr),+] => {
+    [$($e1:expr => $e2:expr),+] => {
         {
         let mut sub = Substitution::new();
         $(
-            sub.insert($l, $e);
+            sub.insert($e1, $e2);
         )+
         sub
         }
@@ -33,10 +33,82 @@ macro_rules! app {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum MonoType {
     Variable(usize),
     Application(TypeName, Vec<MonoType>)
+}
+impl PartialEq for MonoType {
+    fn eq(&self, x: &Self) -> bool {
+        match (self, x) {
+            // Both variables, check IDs
+            (MonoType::Variable(x1), MonoType::Variable(x2)) => x1 == x2,
+            // Both applications, check names and contents
+            (MonoType::Application(n1, v1), MonoType::Application(n2, v2)) => {
+                n1 == n2 && 
+                v1.len() == v2.len() && 
+                v1.iter().zip(v2).all(|(r1, r2)| r1 == r2)
+            },
+            // Not same type, false
+            _ => false
+        }
+    }
+}
+impl MonoType {
+    pub fn contains(&self, t2: &MonoType) -> bool {
+        // Check self
+        match self {
+            // Self is type application
+            MonoType::Application(_, v) => {
+                // Any parameters contain t2
+                v.iter().any(|r| r.contains(t2))
+            },
+            // Self is variable
+            _ => self == t2
+        }
+    }
+    pub fn unify(&self, t2: &MonoType) -> Result<Substitution, String> {
+        match (self, t2) {
+            // Both variables
+            (MonoType::Variable(x1), MonoType::Variable(x2)) => {
+                // Same variable, don't map
+                if x1 == x2 {
+                    Ok(sub![])
+                }
+                // Different variables, map self to t2 
+                else {
+                    Ok(sub![*x1 => t2.clone()])
+                }
+            },
+            // Variable and application
+            (MonoType::Variable(x1), _) => {
+                // Check for infinite type
+                if t2.contains(self) { return Err("Infinite type detected".to_string()) }
+                // Map self to t2
+                Ok(sub![*x1 => t2.clone()])
+            }
+            // Any and variable
+            (_, MonoType::Variable(_)) => {
+                // Unify b and a
+                t2.unify(self)
+            },
+            // Both applications
+            (MonoType::Application(n1, v1), MonoType::Application(n2, v2)) => {
+                // Check that type names are the same
+                if n1 != n2 { return Err("Could not unify types due to different type functions".to_string()) }
+                // Check that lengths are the same
+                if v1.len() != v2.len() { return Err("Could not unify types due to different lengths".to_string()) }
+                // Empty substitution
+                let mut s = sub![];
+                // Iterate through v1, v2 and combine
+                for (x1, x2) in v1.iter().zip(v2) {
+                    s = s.combine(&s.applym(x1).unify(&s.applym(x2))?)
+                };
+                // Return
+                Ok(s)
+            }
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
