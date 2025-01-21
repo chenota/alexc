@@ -24,10 +24,12 @@ pub trait DoesSub {
 impl DoesSub for Substitution {
     fn applym(&self, m: &MonoType) -> MonoType {
         match m {
+            // Variable: Take mapping if exists, otherwise clone original
             MonoType::Variable(x) => match self.get(x) {
                 Some(x) => x.clone(),
                 None => m.clone()
             },
+            // Applicaton: Apply to all sub-types
             MonoType::Application(name, ls) => MonoType::Application(
                 name.clone(), 
                 ls.iter().map(|r| self.applym(r)).collect()
@@ -47,7 +49,7 @@ impl DoesSub for Substitution {
     fn combine(&self, s: &Substitution) -> Substitution {
         // Copy top-level (s1, self)
         let mut s_new = self.clone();
-        // Insert s1(s2) for each item in s2
+        // Insert k -> s1(v) for each item (k, v) in s2
         for (k, v) in s { s_new.insert(*k, self.applym(v)); };
         // Return
         s_new
