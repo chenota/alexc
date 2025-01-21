@@ -1,15 +1,14 @@
 #[cfg(test)]
 mod inference_tests {
+    use crate::{sub, var, app};
     use crate::inference::inference::*;
 
     #[test]
     fn subm1() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Variable(0);
+        let t = var!(0);
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -23,11 +22,9 @@ mod inference_tests {
     #[test]
     fn subm2() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Variable(1);
+        let t = var!(1);
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -41,11 +38,9 @@ mod inference_tests {
     #[test]
     fn subm3() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Variable(3);
+        let t = var!(3);
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -59,11 +54,9 @@ mod inference_tests {
     #[test]
     fn subf1() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Application(TypeName::Char, vec![MonoType::Variable(0), MonoType::Variable(1)]);
+        let t = app!(TypeName::Char => var!(0), var!(1));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -81,11 +74,9 @@ mod inference_tests {
     #[test]
     fn subf2() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Application(TypeName::Char, vec![MonoType::Variable(1), MonoType::Variable(0)]);
+        let t = app!(TypeName::Char => var!(1), var!(0));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -103,11 +94,9 @@ mod inference_tests {
     #[test]
     fn subf3() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Application(TypeName::Char, vec![MonoType::Variable(1), MonoType::Variable(3)]);
+        let t = app!(TypeName::Char => var!(1), var!(3));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -125,11 +114,9 @@ mod inference_tests {
     #[test]
     fn subfnested() {
         // Create substitution
-        let mut s = Substitution::new();
-        s.insert(0, MonoType::Variable(1));
-        s.insert(1, MonoType::Variable(2));
+        let s = sub![0 -> var!(1), 1 -> var!(2)];
         // Type to try on
-        let t = MonoType::Application(TypeName::Char, vec![MonoType::Application(TypeName::Int64, vec![MonoType::Variable(0)])]);
+        let t = app!(TypeName::Char => app!(TypeName::Int64 => var!(0)));
         // Apply substitution
         let t_new = s.applym(&t);
         // Check
@@ -152,11 +139,9 @@ mod inference_tests {
     #[test]
     fn combine1() {
         // Create substitution 1
-        let mut s1 = Substitution::new();
-        s1.insert(1, MonoType::Variable(2));
+        let s1 = sub![1 -> var!(2)];
         // Create substitution 2
-        let mut s2 = Substitution::new();
-        s2.insert(0, MonoType::Variable(1));
+        let s2 = sub![0 -> var!(1)];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check
@@ -169,11 +154,9 @@ mod inference_tests {
     #[test]
     fn combine2() {
         // Create substitution 1
-        let mut s1 = Substitution::new();
-        s1.insert(0, MonoType::Variable(1));
+        let s1 = sub![0 -> var!(1)];
         // Create substitution 2
-        let mut s2 = Substitution::new();
-        s2.insert(2, MonoType::Application(TypeName::Char, vec![MonoType::Variable(0)]));
+        let s2 = sub![2 -> app!(TypeName::Char => var!(0))];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check
@@ -192,11 +175,9 @@ mod inference_tests {
     #[test]
     fn combine3() {
         // Create substitution 1
-        let mut s1 = Substitution::new();
-        s1.insert(0, MonoType::Variable(2));
+        let s1 = sub![0 -> var!(2)];
         // Create substitution 2
-        let mut s2 = Substitution::new();
-        s2.insert(0, MonoType::Variable(1));
+        let s2 = sub![0 -> var!(1)];
         // Combine s1 and s2
         let s3 = s1.combine(&s2);
         // Check

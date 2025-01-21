@@ -1,5 +1,38 @@
 use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 
+#[macro_export]
+macro_rules! sub {
+    [] => {
+        Substitution::new()
+    };
+    [$($l:literal -> $e:expr),+] => {
+        {
+        let mut sub = Substitution::new();
+        $(
+            sub.insert($l, $e);
+        )+
+        sub
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! var {
+    ($l:literal) => {
+        MonoType::Variable($l)
+    }
+}
+
+#[macro_export]
+macro_rules! app {
+    ($e1:expr $(=> $($e2:expr),*)?) => {
+        MonoType::Application(
+            $e1,
+            vec![ $($($e2),*)? ]
+        )
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum MonoType {
     Variable(usize),
