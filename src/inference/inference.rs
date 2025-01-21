@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum MonoType {
     Variable(usize),
     Function(TypeName, Vec<MonoType>)
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TypeName {
     Int64,
     Char
