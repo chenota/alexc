@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum MonoType {
@@ -54,4 +54,15 @@ impl DoesSub for Substitution {
         // Return
         s_new
     }
+}
+
+fn uniqvar() -> MonoType {
+    // Static variable to keep track of unique IDs
+    static UID: AtomicUsize = AtomicUsize::new(0);
+    // Load value
+    let val = UID.load(Ordering::Relaxed);
+    // Update value
+    UID.store(val + 1, Ordering::Relaxed);
+    // Return
+    MonoType::Variable(val)
 }
