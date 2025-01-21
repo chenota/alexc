@@ -56,7 +56,7 @@ impl DoesSub for Substitution {
     }
 }
 
-fn uniqvar() -> MonoType {
+pub fn uniqvar() -> MonoType {
     // Static variable to keep track of unique IDs
     static UID: AtomicUsize = AtomicUsize::new(0);
     // Load value

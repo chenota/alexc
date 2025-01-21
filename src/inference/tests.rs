@@ -205,4 +205,17 @@ mod inference_tests {
         // Return
         ()
     }
+    #[test]
+    fn uniq() {
+        // Get some unique type variables
+        let v1 = uniqvar();
+        let v2 = uniqvar();
+        let v3 = uniqvar();
+        // Check
+        assert_eq!(v1, MonoType::Variable(0));
+        assert_eq!(v2, MonoType::Variable(1));
+        assert_eq!(v3, MonoType::Variable(2));
+        // Return
+        ()
+    }
 }
