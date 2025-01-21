@@ -25,10 +25,10 @@ macro_rules! var {
 
 #[macro_export]
 macro_rules! app {
-    ($e1:expr $(=> $($e2:expr),*)?) => {
+    ($e1:expr $(=> $($e2:expr),+)?) => {
         MonoType::Application(
             $e1,
-            vec![ $($($e2),*)? ]
+            vec![ $($($e2),+)? ]
         )
     }
 }
