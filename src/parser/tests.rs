@@ -153,4 +153,20 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn uop1() {
+        // Stream
+        let s = "-x;".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::UopExpression(Uop::NegUop, _)) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
 }
