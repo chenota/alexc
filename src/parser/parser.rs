@@ -305,7 +305,19 @@ impl Parser {
         self.parse_bop_expr(Self::e1, &ARITH_PLUS)
     }
     fn e1(&mut self) -> Result<Option<Expression>, String> {
-        self.parse_bop_expr(Self::value, &ARITH_TIMES)
+        self.parse_bop_expr(Self::e2, &ARITH_TIMES)
+    }
+    fn e2(&mut self) -> Result<Option<Expression>, String> {
+        // Check for negative sign
+        if self.expect(TokenType::Minus)?.is_some() {
+            // Parse expression
+            return match self.expression()? {
+                Some(e) => Ok(Some(Expression::UopExpression(Uop::NegUop, Box::new(e)))),
+                None => Err(self.expected_err("Expression"))
+            };
+        };
+        // Parse value
+        self.value()
     }
     fn value(&mut self) -> Result<Option<Expression>, String> {
         // Check for parenthesis
