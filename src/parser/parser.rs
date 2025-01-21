@@ -316,8 +316,31 @@ impl Parser {
                 None => Err(self.expected_err("Expression"))
             };
         };
-        // Parse value
-        self.value()
+        // Parse e3
+        self.e3()
+    }
+    fn e3(&mut self) -> Result<Option<Expression>, String> {
+        // Parse value, return none if not found
+        let v = match self.value()? {
+            Some(v) => v,
+            _ => return Ok(None)
+        };
+        // Check for open paren
+        if self.expect(TokenType::LParen)?.is_some() {
+            // Check if e is an identifier
+            let vstr = match v {
+                Expression::VariableExpression(s) => s,
+                _ => return Err("Syntax Error: Called a non-function expression".to_string())
+            };
+            // Parse expression list
+            let elist = self.exprlist()?;
+            // Expect right paren
+            self.expect_err(TokenType::RParen)?;
+            // Return
+            return Ok(Some(Expression::CallExpression(vstr, elist)))
+        };
+        // Return value
+        Ok(Some(v))
     }
     fn value(&mut self) -> Result<Option<Expression>, String> {
         // Check for parenthesis
@@ -404,6 +427,25 @@ impl Parser {
         };
         // Return the list
         Ok(idents)
+    }
+    fn exprlist(&mut self) -> Result<ExprList, String> {
+        // Expressions
+        let mut exprs = Vec::new();
+        // Loop
+        loop {
+            // Attempt to parse an expression
+            match self.expression()? {
+                Some(e) => {
+                    // Push expression to vector
+                    exprs.push(e);
+                    // Break if no comma
+                    if self.expect(TokenType::Comma)?.is_none() { break }
+                },
+                _ => break
+            };
+        };
+        // Return the list
+        Ok(exprs)
     }
     fn parse_type(&mut self) -> Result<MonoType, String> {
         // Check for identifier
