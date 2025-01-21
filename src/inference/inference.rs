@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[derive(Clone, PartialEq, Debug)]
 pub enum MonoType {
     Variable(usize),
-    Function(TypeName, Vec<MonoType>)
+    Application(TypeName, Vec<MonoType>)
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -27,7 +27,7 @@ impl Apply for Substitution {
                 Some(x) => x.clone(),
                 None => m.clone()
             },
-            MonoType::Function(name, ls) => MonoType::Function(
+            MonoType::Application(name, ls) => MonoType::Application(
                 name.clone(), 
                 ls.iter().map(|r| self.applym(r)).collect()
             )

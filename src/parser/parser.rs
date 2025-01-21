@@ -451,6 +451,6 @@ impl Parser {
             _ => return Err(self.expected_err("Type"))
         };
         // Return monotype
-        Ok(MonoType::Function(first, Vec::new()))
+        Ok(MonoType::Application(first, Vec::new()))
     }
 }

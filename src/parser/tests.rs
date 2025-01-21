@@ -146,7 +146,7 @@ mod parser_tests {
                 assert_eq!(name, "main");
                 assert_eq!(params.len(), 0);
                 match ret_type {
-                    MonoType::Function(TypeName::Int64, _) => (),
+                    MonoType::Application(TypeName::Int64, _) => (),
                     _ => panic!()
                 }
             }
