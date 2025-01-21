@@ -122,4 +122,31 @@ mod inference_tests {
         // Return
         ()
     }
+    #[test]
+    fn subfnested() {
+        // Create substitution
+        let mut s = Substitution::new();
+        s.insert(0, MonoType::Variable(1));
+        s.insert(1, MonoType::Variable(2));
+        // Type to try on
+        let t = MonoType::Function(TypeName::Char, vec![MonoType::Function(TypeName::Int64, vec![MonoType::Variable(0)])]);
+        // Apply substitution
+        let t_new = s.applym(&t);
+        // Check
+        match t_new {
+            MonoType::Function(TypeName::Char, v1) => {
+                assert_eq!(v1.len(), 1);
+                match &v1[0] {
+                    MonoType::Function(TypeName::Int64, v2) => {
+                        assert_eq!(v2.len(), 1);
+                        assert_eq!(v2[0], MonoType::Variable(1))
+                    },
+                    _ => panic!()
+                }
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
 }
