@@ -18,6 +18,7 @@ pub type Substitution = HashMap<usize, MonoType>;
 pub trait DoesSub {
     fn applym(&self, m: &MonoType) -> MonoType;
     fn applyc(&self, c: &Context) -> Context;
+    fn combine(&self, s: &Substitution) -> Substitution;
 }
 
 impl DoesSub for Substitution {
@@ -42,5 +43,13 @@ impl DoesSub for Substitution {
         };
         // Return
         new_c
+    }
+    fn combine(&self, s: &Substitution) -> Substitution {
+        // Copy top-level (s1, self)
+        let mut s_new = self.clone();
+        // Insert s1(s2) for each item in s2
+        for (k, v) in s { s_new.insert(*k, self.applym(v)); };
+        // Return
+        s_new
     }
 }
