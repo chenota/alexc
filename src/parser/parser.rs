@@ -16,6 +16,7 @@ pub enum Expression {
     BopExpression(Bop, Box<Expression>, Box<Expression>),
     IntLiteral(usize),
     CharLiteral(char),
+    BoolLiteral(bool),
     VariableExpression(Ident),
     CallExpression(Ident, ExprList)
 }
@@ -445,6 +446,7 @@ impl Parser {
                 match s.as_str() {
                     "i64" => TypeName::Int64,
                     "char" => TypeName::Char,
+                    "bool" => TypeName::Bool,
                     _ => return Err(self.expected_err("Type"))
                 }
             },
@@ -454,3 +456,5 @@ impl Parser {
         Ok(MonoType::Application(first, Vec::new()))
     }
 }
+
+const X: (i64,) = (0,);

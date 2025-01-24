@@ -115,7 +115,8 @@ impl MonoType {
 pub enum TypeName {
     Int64,
     Char,
-    Tuple
+    Tuple,
+    Bool
 }
 
 pub type Context = HashMap<usize, MonoType>;
