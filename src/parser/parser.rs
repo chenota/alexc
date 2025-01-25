@@ -369,6 +369,11 @@ impl Parser {
             Some((_, TokenValue::Char(x), _)) => return Ok(Some(Expression::CharLiteral(x.clone()))),
             _ => ()
         };
+        // Check for boolean literal
+        match self.expect(TokenType::Boolean)? {
+            Some((_, TokenValue::Bool(x), _)) => return Ok(Some(Expression::BoolLiteral(x.clone()))),
+            _ => ()
+        };
         Ok(None)
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {
