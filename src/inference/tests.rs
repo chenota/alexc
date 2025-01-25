@@ -307,4 +307,147 @@ mod typesolver_tests {
         // Return
         ()
     }
+    #[test]
+    fn fn1() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "zero".to_string(),
+            vec![]
+        );
+        // Empty program
+        let p = Parser::new("fun zero(): i64 { return 0; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Int64));
+        // Return
+        ()
+    }
+    #[test]
+    fn fn2() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "ident".to_string(),
+            vec![
+                Expression::IntLiteral(0)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun ident(x: i64): i64 { return x; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Int64));
+        // Return
+        ()
+    }
+    #[test]
+    fn fn3() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "add".to_string(),
+            vec![
+                Expression::IntLiteral(2),
+                Expression::IntLiteral(2)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun add(x: i64, y: i64): i64 { return x + y; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Int64));
+        // Return
+        ()
+    }
+    #[test]
+    fn fn4() {
+        // Expression to determine type of
+        let e: Expression = Expression::CallExpression(
+            "idk".to_string(),
+            vec![
+                Expression::IntLiteral(2)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun idk(x: i64): bool { return false; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Bool));
+        // Return
+        ()
+    }
+    #[test]
+    fn fnerr1() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "poop".to_string(),
+            vec![
+                Expression::IntLiteral(0)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun ident(x: i64): i64 { return x; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        match tinf.algw(Context::new(), e) {
+            Err(_) => (),
+            _ => panic!()
+        };
+        // Return
+        ()
+    }
+    #[test]
+    fn fnerr2() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "ident".to_string(),
+            vec![
+                Expression::IntLiteral(0),
+                Expression::IntLiteral(0)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun ident(x: i64): i64 { return x; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        match tinf.algw(Context::new(), e) {
+            Err(_) => (),
+            _ => panic!()
+        };
+        // Return
+        ()
+    }
+    #[test]
+    fn fnerr3() {
+        // Expression to determine type of
+        let e = Expression::CallExpression(
+            "ident".to_string(),
+            vec![
+                Expression::BoolLiteral(false)
+            ]
+        );
+        // Empty program
+        let p = Parser::new("fun ident(x: i64): i64 { return x; }".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        match tinf.algw(Context::new(), e) {
+            Err(_) => (),
+            _ => panic!()
+        };
+        // Return
+        ()
+    }
 }
