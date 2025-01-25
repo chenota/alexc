@@ -53,6 +53,38 @@ mod parser_tests {
         ()
     }
     #[test]
+    fn bool1() {
+        // Stream
+        let s = "false;".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::BoolLiteral(v)) => assert!(!*v),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn bool2() {
+        // Stream
+        let s = "true;".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Check values
+        match &x.1[0] {
+            Statement::ExprStatement(Expression::BoolLiteral(v)) => assert!(*v),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
     fn plus() {
         // Stream
         let s = "1+1;".to_string();
