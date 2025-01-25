@@ -55,6 +55,23 @@ mod tgen_tests {
         ()
     }
     #[test]
+    fn bool1() {
+        // Stream
+        let s = "false true".to_string();
+        // Token generator
+        let mut t = TokenGen::new(s);
+        // Collect tokens
+        let seq = t
+            .take(2)
+            .map(|x| match x { Ok((_, TokenValue::Bool(s), _)) => s, _ => false })
+            .collect::<Vec<_>>();
+        // Check values
+        assert_eq!(seq[0], false);
+        assert_eq!(seq[1], true);
+        // Return
+        ()
+    }
+    #[test]
     fn big1() {
         // Stream
         let s = "-12-12".to_string();
