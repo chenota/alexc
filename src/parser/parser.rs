@@ -11,6 +11,7 @@ pub enum Statement {
     AssignStmt(Ident, Expression),
 }
 
+#[derive(Clone)]
 pub enum Expression {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),

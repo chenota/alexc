@@ -189,9 +189,9 @@ mod inference_tests {
     #[test]
     fn uniq() {
         // Get some unique type variables
-        let v1 = uniqvar();
-        let v2 = uniqvar();
-        let v3 = uniqvar();
+        let v1 = MonoType::Variable(uniqvar());
+        let v2 = MonoType::Variable(uniqvar());
+        let v3 = MonoType::Variable(uniqvar());
         // Check
         assert_eq!(v1, MonoType::Variable(0));
         assert_eq!(v2, MonoType::Variable(1));
@@ -251,6 +251,53 @@ mod inference_tests {
         let t2 = app!(TypeName::Tuple => var!(0), var!(0));
         // Unify and assert is error
         assert!(t1.unify(&t2).is_err());
+        // Return
+        ()
+    }
+}
+
+#[cfg(test)]
+mod typesolver_tests {
+    use crate::inference::inference::*;
+    use crate::parser::parser::*;
+    use crate::{sub, var, app};
+
+    #[test]
+    fn litbool() {
+        // Expression to determine type of
+        let e = Expression::BoolLiteral(false);
+        // Create type inference object
+        let mut tinf = TypeSolver::new();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Bool));
+        // Return
+        ()
+    }
+    #[test]
+    fn litchar() {
+        // Expression to determine type of
+        let e = Expression::CharLiteral('a');
+        // Create type inference object
+        let mut tinf = TypeSolver::new();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Char));
+        // Return
+        ()
+    }
+    #[test]
+    fn litint() {
+        // Expression to determine type of
+        let e = Expression::IntLiteral(0);
+        // Create type inference object
+        let mut tinf = TypeSolver::new();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Int64));
         // Return
         ()
     }

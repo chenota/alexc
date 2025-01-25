@@ -1,5 +1,7 @@
 use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 
+use crate::parser::parser::Expression;
+
 #[macro_export]
 macro_rules! sub {
     [] => {
@@ -109,6 +111,12 @@ impl MonoType {
             }
         }
     }
+    pub fn len(&self) -> usize {
+        match self {
+            MonoType::Application(_, v) => v.len(),
+            _ => 0
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -116,7 +124,8 @@ pub enum TypeName {
     Int64,
     Char,
     Tuple,
-    Bool
+    Bool,
+    Function,
 }
 
 pub type Context = HashMap<usize, MonoType>;
@@ -163,7 +172,7 @@ impl DoesSub for Substitution {
     }
 }
 
-pub fn uniqvar() -> MonoType {
+pub fn uniqvar() -> usize {
     // Static variable to keep track of unique IDs
     static UID: AtomicUsize = AtomicUsize::new(0);
     // Load value
@@ -171,5 +180,81 @@ pub fn uniqvar() -> MonoType {
     // Update value
     UID.store(val + 1, Ordering::Relaxed);
     // Return
-    MonoType::Variable(val)
+    val
+}
+
+pub struct TypeSolver {
+    var_table: HashMap<String, usize>,
+    fn_type_table: HashMap<String, MonoType>
+}
+impl TypeSolver {
+    pub fn new() -> TypeSolver {
+        TypeSolver {
+            var_table: HashMap::new(),
+            fn_type_table: HashMap::new()
+        }
+    }
+    pub fn algw(&mut self, type_env: Context, expr: Expression) -> Result<(Substitution, MonoType), String> {
+        match expr {
+            Expression::VariableExpression(s) => {
+                // Get a unique ID for the variable, create one if does not exist
+                let uid = self.var_table.entry(s.clone()).or_insert(uniqvar());
+                // Check for variable in the context
+                let value: MonoType = match type_env.get(uid) {
+                    Some(x) => x.clone(),
+                    _ => return Err("Undefined variable: ".to_string() + &s)
+                };
+                // Return variable
+                return Ok((Substitution::new(), value))
+            },
+            Expression::CallExpression(fname, args) => {
+                // Get type of function being called
+                let fn_type = match self.fn_type_table.get(&fname) {
+                    Some(v) => v.clone(),
+                    _ => return Err("Undefined function: ".to_string() + &fname)
+                };
+                // Get function args types
+                let fn_args = match &fn_type {
+                    MonoType::Application(TypeName::Function, v) => v.clone(),
+                    _ => return Err("Invalid function: ".to_string() + &fname)
+                };
+                // Verify args length matches function input length
+                if args.len() != fn_args.len() - 1 { return Err("Invalid function call: ".to_string() + &fname) }
+                // Substitution for learning from args
+                let mut args_sub = Substitution::new();
+                // Vector for args types
+                let mut args_vec = Vec::new();
+                // Calculate and verify type of args
+                for arg in args {
+                    // Get type of argument
+                    let (s, t) = self.algw(type_env.clone(), arg.clone())?;
+                    // Combine s w/ accumulator substitution
+                    args_sub = args_sub.combine(&s);
+                    // Add t to args type vec
+                    args_vec.push(t);
+                }
+                // New beta variable
+                let beta = MonoType::Variable(uniqvar());
+                // Push new type variable to end of args vector as return type
+                args_vec.push(beta.clone());
+                // Unify function type with learned args types
+                let s3 = args_sub.applym(&fn_type).unify(&MonoType::Application(TypeName::Function, args_vec))?;
+                // Return function return type as type for this call
+                return Ok((s3.combine(&args_sub), s3.applym(&beta)))
+            },
+            Expression::IntLiteral(_) => {
+                // Return fixed type
+                return Ok((Substitution::new(), MonoType::Application(TypeName::Int64, Vec::new())))
+            },
+            Expression::BoolLiteral(_) => {
+                // Return fixed type
+                return Ok((Substitution::new(), MonoType::Application(TypeName::Bool, Vec::new())))
+            },
+            Expression::CharLiteral(_) => {
+                // Return fixed type
+                return Ok((Substitution::new(), MonoType::Application(TypeName::Char, Vec::new())))
+            },
+            _ => panic!()
+        };
+    }
 }
