@@ -2,7 +2,7 @@ use crate::lexer::lexer::*;
 use crate::inference::inference::*;
 
 pub type Program = (Vec<Function>, Vec<Statement>);
-pub type Function = (Ident, TypedIdentList, MonoType, StmtList);
+pub type Function = (Ident, Force_TypedIdentList, MonoType, StmtList);
 
 pub enum Statement {
     ExprStatement(Expression),
@@ -37,9 +37,11 @@ pub enum Bop {
 
 pub type Ident = String;
 pub type TypedIdent = (String, Option<MonoType>);
+pub type Force_TypedIdent = (String, MonoType);
 
 pub type IdentList = Vec<Ident>;
 pub type TypedIdentList = Vec<TypedIdent>;
+pub type Force_TypedIdentList = Vec<Force_TypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
 
@@ -74,6 +76,10 @@ impl Parser {
     // Expected message
     fn expected_err(&self, x: &str) -> String {
         "Syntax Error: Expected ".to_string() + x + " at " + &self.row.to_string() + ":" + &self.col.to_string()
+    }
+    // Generic error message w/ position
+    fn generic_err(&self, x: &str) -> String {
+        "Syntax Error at ".to_string() + &self.row.to_string() + ":" + &self.col.to_string() + ": " + x
     }
     // Mark position
     fn mark(&self) -> usize {
@@ -163,7 +169,7 @@ impl Parser {
         // Expect open paren
         self.expect_err(TokenType::LParen)?;
         // Parse identifier list
-        let idlist = self.typed_identlist()?;
+        let idlist = self.force_typed_identlist()?;
         // Expect closing paren
         self.expect_err(TokenType::RParen)?;
         // Expect colon
@@ -402,6 +408,16 @@ impl Parser {
         // Put together
         Ok(Some((id, t)))
     }
+    fn force_typed_ident(&mut self) -> Result<Option<Force_TypedIdent>, String> {
+        // Parse a regular typed ident
+        let tid = self.typed_ident()?;
+        // Check if none or found
+        match tid {
+            Some((s, Some(t))) => Ok(Some((s, t))),
+            Some(_) => Err(self.generic_err("Function definitions must be explicitly type-annotated")),
+            None => Ok(None)
+        }
+    }
     fn typed_identlist(&mut self) -> Result<TypedIdentList, String> {
         // Identifiers
         let mut idents = Vec::new();
@@ -409,6 +425,25 @@ impl Parser {
         loop {
             // Attempt to parse an identifier
             match self.typed_ident()? {
+                Some(tid) => {
+                    // Push found identifier string
+                    idents.push(tid);
+                    // Break if no comma
+                    if self.expect(TokenType::Comma)?.is_none() { break }
+                },
+                _ => break
+            };
+        };
+        // Return the list
+        Ok(idents)
+    }
+    fn force_typed_identlist(&mut self) -> Result<Force_TypedIdentList, String> {
+        // Identifiers
+        let mut idents = Vec::new();
+        // Loop
+        loop {
+            // Attempt to parse an identifier
+            match self.force_typed_ident()? {
                 Some(tid) => {
                     // Push found identifier string
                     idents.push(tid);

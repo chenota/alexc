@@ -266,8 +266,10 @@ mod typesolver_tests {
     fn litbool() {
         // Expression to determine type of
         let e = Expression::BoolLiteral(false);
+        // Empty program
+        let p = Parser::new("".to_string()).parse().unwrap();
         // Create type inference object
-        let mut tinf = TypeSolver::new();
+        let mut tinf = TypeSolver::new(&p).unwrap();
         // Use algorithm w to find type of expression
         let (_, t) = tinf.algw(Context::new(), e).unwrap();
         // Unify and assert is error
@@ -279,8 +281,10 @@ mod typesolver_tests {
     fn litchar() {
         // Expression to determine type of
         let e = Expression::CharLiteral('a');
+        // Empty program
+        let p = Parser::new("".to_string()).parse().unwrap();
         // Create type inference object
-        let mut tinf = TypeSolver::new();
+        let mut tinf = TypeSolver::new(&p).unwrap();
         // Use algorithm w to find type of expression
         let (_, t) = tinf.algw(Context::new(), e).unwrap();
         // Unify and assert is error
@@ -292,8 +296,10 @@ mod typesolver_tests {
     fn litint() {
         // Expression to determine type of
         let e = Expression::IntLiteral(0);
+        // Empty program
+        let p = Parser::new("".to_string()).parse().unwrap();
         // Create type inference object
-        let mut tinf = TypeSolver::new();
+        let mut tinf = TypeSolver::new(&p).unwrap();
         // Use algorithm w to find type of expression
         let (_, t) = tinf.algw(Context::new(), e).unwrap();
         // Unify and assert is error

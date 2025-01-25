@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 
-use crate::parser::parser::Expression;
+use crate::parser::parser::*;
 
 #[macro_export]
 macro_rules! sub {
@@ -188,11 +188,25 @@ pub struct TypeSolver {
     fn_type_table: HashMap<String, MonoType>
 }
 impl TypeSolver {
-    pub fn new() -> TypeSolver {
-        TypeSolver {
+    pub fn new(prog: &Program) -> Result<TypeSolver, String> {
+        // Add all function types to table
+        let mut fn_type_table = HashMap::new();
+        for f in &prog.0 {
+            // Vector for application type by extracting monotypes from function
+            let mut app_vec: Vec<MonoType> = f.1.iter().map(|r| r.1.clone()).collect();
+            // Insert return type at end
+            app_vec.push(f.2.clone());
+            // Insert into table, check for duplicate function name
+            match fn_type_table.insert(f.0.clone(), MonoType::Application(TypeName::Function, app_vec)) {
+                Some(_) => return Err("Duplicate function name: ".to_string() + &f.0),
+                _ => ()
+            };
+        };
+        // Return new object
+        Ok(TypeSolver {
             var_table: HashMap::new(),
-            fn_type_table: HashMap::new()
-        }
+            fn_type_table
+        })
     }
     pub fn algw(&mut self, type_env: Context, expr: Expression) -> Result<(Substitution, MonoType), String> {
         match expr {
