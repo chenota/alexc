@@ -510,5 +510,3 @@ impl Parser {
         Ok(first)
     }
 }
-
-const X: (i64,) = (0,);
