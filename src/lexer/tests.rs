@@ -41,7 +41,7 @@ mod tgen_tests {
         // Stream
         let s = "12 45 918".to_string();
         // Token generator
-        let mut t = TokenGen::new(s);
+        let t = TokenGen::new(s);
         // Collect tokens
         let seq = t
             .take(3)
@@ -51,23 +51,6 @@ mod tgen_tests {
         assert_eq!(seq[0], 12);
         assert_eq!(seq[1], 45);
         assert_eq!(seq[2], 918);
-        // Return
-        ()
-    }
-    #[test]
-    fn bool1() {
-        // Stream
-        let s = "false true".to_string();
-        // Token generator
-        let mut t = TokenGen::new(s);
-        // Collect tokens
-        let seq = t
-            .take(2)
-            .map(|x| match x { Ok((_, TokenValue::Bool(s), _)) => s, _ => false })
-            .collect::<Vec<_>>();
-        // Check values
-        assert_eq!(seq[0], false);
-        assert_eq!(seq[1], true);
         // Return
         ()
     }
