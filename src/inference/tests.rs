@@ -450,4 +450,21 @@ mod typesolver_tests {
         // Return
         ()
     }
+    #[test]
+    fn let1() {
+        // Expression to determine type of
+        let e = Expression::VariableExpression(
+            "x".to_string()
+        );
+        // Empty program
+        let p = Parser::new("let x = 0;".to_string()).parse().unwrap();
+        // Create type inference object
+        let mut tinf = TypeSolver::new(&p).unwrap();
+        // Use algorithm w to find type of expression
+        let (_, t) = tinf.algw(Context::new(), e).unwrap();
+        // Unify and assert is error
+        assert_eq!(t, app!(TypeName::Int64));
+        // Return
+        ()
+    }
 }
