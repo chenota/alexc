@@ -273,7 +273,7 @@ impl TypeSolver {
                 // Check for variable in the context
                 let value: MonoType = match type_env.get(uid) {
                     Some(x) => x.clone(),
-                    _ => return Err("Undefined variable: ".to_string() + &s)
+                    _ => return Err("Error: Undefined variable: ".to_string() + &s)
                 };
                 // Return variable
                 return Ok((Substitution::new(), value))
@@ -282,7 +282,7 @@ impl TypeSolver {
                 // Get type of function being called
                 let fn_type = match self.fn_type_table.get(&fname) {
                     Some(v) => v.clone(),
-                    _ => return Err("Undefined function: ".to_string() + &fname)
+                    _ => return Err("Error: Undefined function: ".to_string() + &fname)
                 };
                 // Get function args types
                 let fn_args = match &fn_type {
