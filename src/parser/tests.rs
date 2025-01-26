@@ -2,7 +2,6 @@
 
 mod parser_tests {
     use crate::parser::parser::*;
-    use crate::typecheck::typecheck::*;
 
     #[test]
     fn var1() {
