@@ -16,9 +16,7 @@ pub enum Statement {
 pub enum Expression {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),
-    IntLiteral(usize),
-    CharLiteral(char),
-    BoolLiteral(bool),
+    IntLiteral(bool, usize),
     VariableExpression(Ident),
     CallExpression(Ident, ExprList)
 }
@@ -303,7 +301,15 @@ impl Parser {
         if self.expect(TokenType::Minus)?.is_some() {
             // Parse expression
             return match self.expression()? {
-                Some(e) => Ok(Some(Expression::UopExpression(Uop::NegUop, Box::new(e)))),
+                Some(e) => {
+                    // Check type of expression
+                    match e {
+                        // Int literal, flip sign
+                        Expression::IntLiteral(sign, magnitude) => Ok(Some(Expression::IntLiteral(!sign, magnitude))),
+                        // Anything else, create uop expression
+                        _ => Ok(Some(Expression::UopExpression(Uop::NegUop, Box::new(e))))
+                    }
+                },
                 None => Err(self.expected_err("Expression"))
             };
         };
@@ -353,7 +359,7 @@ impl Parser {
         };
         // Check for integer literal
         match self.expect(TokenType::Integer)? {
-            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(x.clone()))),
+            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(false, x.clone()))),
             _ => ()
         };
         Ok(None)

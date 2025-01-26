@@ -33,7 +33,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(v)) => assert_eq!(*v, 100),
+            Statement::ReturnStatement(Expression::IntLiteral(_, v)) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return
@@ -51,7 +51,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(v)) => assert_eq!(*v, 100),
+            Statement::ReturnStatement(Expression::IntLiteral(_, v)) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return
@@ -123,7 +123,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::LetStmt((s, None), Expression::IntLiteral(x)) => {
+            Statement::LetStmt((s, None), Expression::IntLiteral(_, x)) => {
                 assert_eq!(*x, 0);
                 assert_eq!(s, "x")
             },
@@ -144,7 +144,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[1] {
-            Statement::AssignStmt(s, Expression::IntLiteral(x)) => {
+            Statement::AssignStmt(s, Expression::IntLiteral(_, x)) => {
                 assert_eq!(*x, 1);
                 assert_eq!(s, "x")
             },
