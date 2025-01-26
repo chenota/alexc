@@ -18,7 +18,8 @@ pub enum Expression {
     BopExpression(Bop, Box<Expression>, Box<Expression>),
     IntLiteral(bool, usize),
     VariableExpression(Ident),
-    CallExpression(Ident, ExprList)
+    CallExpression(Ident, ExprList),
+    AsExpression(Box<Expression>, Type)
 }
 
 #[derive(Clone)]
@@ -297,10 +298,33 @@ impl Parser {
         self.parse_bop_expr(Self::e2, &ARITH_TIMES)
     }
     fn e2(&mut self) -> Result<Option<Expression>, String> {
+        // Parse an e3
+        let head = match self.e3()? {
+            Some(e) => e,
+            None => return Ok(None)
+        };
+        // Create list of types
+        let mut tlist = Vec::new();
+        // Consume 'as', <expr> pairs
+        loop {
+            // Break if no as keyword
+            if self.expect(TokenType::AsKw)?.is_none() { break }
+            // Consume a type
+            let t = self.parse_type()?;
+            // Push to list
+            tlist.push(t)
+        };
+        // Create left-associative list and return
+        Ok(Some(tlist.drain(..).fold(
+            head,
+            |acc, t| Expression::AsExpression(Box::new(acc), t)
+        )))
+    }
+    fn e3(&mut self) -> Result<Option<Expression>, String> {
         // Check for negative sign
         if self.expect(TokenType::Minus)?.is_some() {
             // Parse expression
-            return match self.expression()? {
+            return match self.e3()? {
                 Some(e) => {
                     // Check type of expression
                     match e {
@@ -313,10 +337,10 @@ impl Parser {
                 None => Err(self.expected_err("Expression"))
             };
         };
-        // Parse e3
-        self.e3()
+        // Parse e4
+        self.e4()
     }
-    fn e3(&mut self) -> Result<Option<Expression>, String> {
+    fn e4(&mut self) -> Result<Option<Expression>, String> {
         // Parse value, return none if not found
         let v = match self.value()? {
             Some(v) => v,
@@ -327,7 +351,7 @@ impl Parser {
             // Check if e is an identifier
             let vstr = match v {
                 Expression::VariableExpression(s) => s,
-                _ => return Err("Syntax Error: Called a non-function expression".to_string())
+                _ => return Err(self.generic_err("Cannot call a non-function"))
             };
             // Parse expression list
             let elist = self.exprlist()?;
