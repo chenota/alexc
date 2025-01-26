@@ -158,11 +158,18 @@ impl Parser {
             _ => return Err(self.expected_err("identifier"))
         };
         // Expect open paren
-        self.expect_err(TokenType::LParen)?;
-        // Parse identifier list
-        let idlist = self.force_typed_identlist()?;
-        // Expect closing paren
-        self.expect_err(TokenType::RParen)?;
+        let idlist = 
+            if self.expect(TokenType::LParen)?.is_some() {
+                // Parse identifier list
+                let idlist = self.force_typed_identlist()?;
+                // Expect closing paren
+                self.expect_err(TokenType::RParen)?;
+                // Return ilist
+                idlist
+            } else {
+                // Empty list
+                Vec::new()
+            };
         // Expect Arrow
         self.expect_err(TokenType::Arrow)?;
         // Expect ident

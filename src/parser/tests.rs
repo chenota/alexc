@@ -346,4 +346,15 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn fn_no_paren() {
+        // Stream
+        let s = "fun main -> i8 { return 0; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        p.parse().unwrap();
+        // Return
+        ()
+    }
 }
