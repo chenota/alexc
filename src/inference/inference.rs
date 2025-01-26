@@ -269,11 +269,14 @@ impl TypeSolver {
         match expr {
             Expression::VariableExpression(s) => {
                 // Get a unique ID for the variable, create one if does not exist
-                let uid = self.var_table.entry(s.clone()).or_insert(uniqvar());
-                // Check for variable in the context
-                let value: MonoType = match type_env.get(uid) {
+                let uid = match self.var_table.get(&s) {
                     Some(x) => x.clone(),
-                    _ => return Err("Error: Undefined variable: ".to_string() + &s)
+                    _ => return Err("Error: Undefined variable (1): ".to_string() + &s)
+                };
+                // Check for variable in the context
+                let value: MonoType = match type_env.get(&uid) {
+                    Some(x) => x.clone(),
+                    _ => return Err("Error: Undefined variable (2): ".to_string() + &s)
                 };
                 // Return variable
                 return Ok((Substitution::new(), value))
