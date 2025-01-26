@@ -287,7 +287,7 @@ impl Parser {
         // Create left-associative list and return
         Ok(Some(elist.drain(..).fold(
             head,
-            |acc, bop| Expression::BopExpression(bop.0, Box::new(bop.1), Box::new(acc))
+            |acc, bop| Expression::BopExpression(bop.0, Box::new(acc), Box::new(bop.1))
         )))
     }
     fn expression(&mut self) -> Result<Option<Expression>, String> {
