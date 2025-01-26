@@ -58,6 +58,48 @@ mod parser_tests {
         ()
     }
     #[test]
+    fn int3() {
+        // Stream
+        let s = "fun main() -> i8 { return -100; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::IntLiteral(s, v)) => {
+                assert_eq!(*v, 100);
+                assert!(s)
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn int4() {
+        // Stream
+        let s = "fun main() -> i8 { return --100; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::IntLiteral(s, v)) => {
+                assert_eq!(*v, 100);
+                assert!(!s)
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
     fn bop1() {
         // Stream
         let s = "fun main() -> i8 { return 1+1; }".to_string();
@@ -70,6 +112,48 @@ mod parser_tests {
         // Check values
         match &mainfn.2[0] {
             Statement::ReturnStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn bop2() {
+        // Stream
+        let s = "fun main() -> i8 { return 1-1; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::BopExpression(Bop::MinusBop, _, _)) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn bop3() {
+        // Stream
+        let s = "fun main() -> i8 { return 1 - -1; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::BopExpression(Bop::MinusBop, _, b)) => match b.as_ref() {
+                Expression::IntLiteral(s, v) => {
+                    assert!(*s);
+                    assert_eq!(*v, 1);
+                },
+                _ => panic!()
+            },
             _ => panic!()
         }
         // Return
