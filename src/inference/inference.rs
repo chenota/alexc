@@ -185,7 +185,9 @@ pub fn uniqvar() -> usize {
 
 pub struct TypeSolver {
     var_table: HashMap<String, usize>,
-    fn_type_table: HashMap<String, MonoType>
+    pub fn_type_table: HashMap<String, MonoType>,
+    pub fn_type_env: Vec<Context>,
+    pub type_env: Context
 }
 impl TypeSolver {
     pub fn new(prog: &Program) -> Result<TypeSolver, String> {
@@ -202,11 +204,66 @@ impl TypeSolver {
                 _ => ()
             };
         };
-        // Return new object
-        Ok(TypeSolver {
+        // Create new object
+        let mut ts = TypeSolver {
             var_table: HashMap::new(),
-            fn_type_table
-        })
+            fn_type_table,
+            fn_type_env: Vec::new(),
+            type_env: Context::new()
+        };
+        // Create typing context for program body
+        for stmt in &prog.1 { ts.load_stmt(stmt)?; };
+        // Return ts
+        Ok(ts)
+    }
+    pub fn load_stmt(&mut self, s: &Statement) -> Result<(), String> {
+        // Check type of statement
+        match s {
+            Statement::LetStmt((varname, vartype), expr) => {
+                // Use algorithm w to find type of expression
+                let (_, etype) = self.algw(self.type_env.clone(), expr.clone())?;
+                // Create beta (new type variable) for varname
+                let beta = uniqvar();
+                // Insert into mappings table for variables
+                if self.var_table.insert(varname.clone(), beta).is_some() { return Err("Error: Duplicate variable name: ".to_string() + varname) };
+                // Check if let statement included user-defined type
+                match vartype {
+                    Some(m) => {
+                        // Make sure expression type and user-defined types are equal
+                        if etype != *m { return Err("Error: Invalid expression for variable: ".to_string() + varname) }
+                        // Add new entry to context, point beta to user-defined type
+                        self.type_env.insert(beta, m.clone());
+                        // Return Ok
+                        Ok(())
+                    },
+                    None => {
+                        // Add new entry to context, point beta to inferred type
+                        self.type_env.insert(beta, etype);
+                        // Return OK
+                        Ok(())
+                    }
+                }
+            },
+            Statement::AssignStmt(varname, expr) => {
+                // Use algorithm w to find type of expression
+                let (_, etype) = self.algw(self.type_env.clone(), expr.clone())?;
+                // Get UID of variable
+                let var_uid = match self.var_table.get(varname) {
+                    Some(x) => x.clone(),
+                    _ => return Err("Error: Variable does not exist: ".to_string() + varname)
+                };
+                // Get type of variable
+                let var_type = match self.type_env.get(&var_uid) {
+                    Some(x) => x,
+                    _ => return Err("Error: Variable does not exist: ".to_string() + varname)
+                };
+                // Check that types are equal
+                if etype != *var_type { return Err("Error: Invalid variable assignment: ".to_string() + varname) }
+                // Return
+                Ok(())
+            },
+            _ => Ok(())
+        }
     }
     pub fn algw(&mut self, type_env: Context, expr: Expression) -> Result<(Substitution, MonoType), String> {
         match expr {
