@@ -2,12 +2,12 @@
 
 mod parser_tests {
     use crate::parser::parser::*;
-    use crate::inference::inference::*;
+    use crate::typecheck::typecheck::*;
 
     #[test]
     fn var1() {
         // Stream
-        let s = "x;".to_string();
+        let s = "0;".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse

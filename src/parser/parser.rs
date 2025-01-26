@@ -1,8 +1,9 @@
 use crate::lexer::lexer::*;
-use crate::inference::inference::*;
+use crate::typecheck::typecheck::*;
+use std::collections::HashMap;
 
-pub type Program = (Vec<Function>, Vec<Statement>);
-pub type Function = (Ident, Force_TypedIdentList, MonoType, StmtList);
+pub type Program = (HashMap<Ident, Function>);
+pub type Function = (ForceTypedIdentList, Type, StmtList);
 
 pub enum Statement {
     ExprStatement(Expression),
@@ -36,12 +37,12 @@ pub enum Bop {
 }
 
 pub type Ident = String;
-pub type TypedIdent = (String, Option<MonoType>);
-pub type Force_TypedIdent = (String, MonoType);
+pub type TypedIdent = (String, Option<Type>);
+pub type ForceTypedIdent = (String, Type);
 
 pub type IdentList = Vec<Ident>;
 pub type TypedIdentList = Vec<TypedIdent>;
-pub type Force_TypedIdentList = Vec<Force_TypedIdent>;
+pub type ForceTypedIdentList = Vec<ForceTypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
 
@@ -132,33 +133,24 @@ impl Parser {
     }
     fn program(&mut self) -> Result<Program, String> {
         // Vectors to hold parts of the program
-        let mut fns = Vec::new();
-        let mut stmts = Vec::new();
+        let mut fns = HashMap::new();
         // Capture statements and functions until can't anymore
         loop {
             // Check if function
             match self.function()? {
                 Some(f) => {
-                    fns.push(f);
+                    fns.insert(f.0, f.1);
                     continue
                 },
                 None => ()
             };
-            // Check if statement
-            match self.statement()? {
-                Some(s) => {
-                    stmts.push(s);
-                    continue
-                },
-                None => ()
-            };
-            // Neither matched, return
+            // Didn't match, return
             break
         }
         // Return program
-        Ok((fns, stmts))
+        Ok(fns)
     }
-    fn function(&mut self) -> Result<Option<Function>, String> {
+    fn function(&mut self) -> Result<Option<(String, Function)>, String> {
         // Check for function keyword
         if self.expect(TokenType::FunKw)?.is_none() { return Ok(None) }
         // Extract ident
@@ -172,8 +164,8 @@ impl Parser {
         let idlist = self.force_typed_identlist()?;
         // Expect closing paren
         self.expect_err(TokenType::RParen)?;
-        // Expect colon
-        self.expect_err(TokenType::Colon)?;
+        // Expect Arrow
+        self.expect_err(TokenType::Arrow)?;
         // Expect ident
         let ret_type = self.parse_type()?;
         // Expect opening bracket
@@ -183,7 +175,7 @@ impl Parser {
         // Expect closing bracket
         self.expect_err(TokenType::RBracket)?;
         // Return
-        Ok(Some((id, idlist, ret_type, stmts)))
+        Ok(Some((id, (idlist, ret_type, stmts))))
     }
     fn statement(&mut self) -> Result<Option<Statement>, String> {
         // Mark position
@@ -364,16 +356,6 @@ impl Parser {
             Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(x.clone()))),
             _ => ()
         };
-        // Check for character literal
-        match self.expect(TokenType::Character)? {
-            Some((_, TokenValue::Char(x), _)) => return Ok(Some(Expression::CharLiteral(x.clone()))),
-            _ => ()
-        };
-        // Check for boolean literal
-        match self.expect(TokenType::Boolean)? {
-            Some((_, TokenValue::Bool(x), _)) => return Ok(Some(Expression::BoolLiteral(x.clone()))),
-            _ => ()
-        };
         Ok(None)
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {
@@ -413,7 +395,7 @@ impl Parser {
         // Put together
         Ok(Some((id, t)))
     }
-    fn force_typed_ident(&mut self) -> Result<Option<Force_TypedIdent>, String> {
+    fn force_typed_ident(&mut self) -> Result<Option<ForceTypedIdent>, String> {
         // Parse a regular typed ident
         let tid = self.typed_ident()?;
         // Check if none or found
@@ -442,7 +424,7 @@ impl Parser {
         // Return the list
         Ok(idents)
     }
-    fn force_typed_identlist(&mut self) -> Result<Force_TypedIdentList, String> {
+    fn force_typed_identlist(&mut self) -> Result<ForceTypedIdentList, String> {
         // Identifiers
         let mut idents = Vec::new();
         // Loop
@@ -480,21 +462,22 @@ impl Parser {
         // Return the list
         Ok(exprs)
     }
-    fn parse_type(&mut self) -> Result<MonoType, String> {
+    fn parse_type(&mut self) -> Result<Type, String> {
         // Check for identifier
         let first = match self.expect(TokenType::Identifier)? {
             Some((_, TokenValue::String(s), _)) => {
                 match s.as_str() {
-                    "i64" => TypeName::Int64,
-                    "char" => TypeName::Char,
-                    "bool" => TypeName::Bool,
+                    "i64" => Type::Int(6),
+                    "i32" => Type::Int(5),
+                    "i16" => Type::Int(4),
+                    "i8" => Type::Int(3),
                     _ => return Err(self.expected_err("Type"))
                 }
             },
             _ => return Err(self.expected_err("Type"))
         };
         // Return monotype
-        Ok(MonoType::Application(first, Vec::new()))
+        Ok(first)
     }
 }
 

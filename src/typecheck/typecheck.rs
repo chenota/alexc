@@ -1,4 +1,3 @@
-#[cfg(test)]
-mod typecheck_tests {
-    
+pub enum Type {
+    Int(u8)
 }
