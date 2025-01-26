@@ -160,6 +160,30 @@ mod parser_tests {
         ()
     }
     #[test]
+    fn bop4() {
+        // Stream
+        let s = "fun main() -> i8 { return 0 * 1; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::BopExpression(Bop::TimesBop, b1, b2)) => match (b1.as_ref(), b2.as_ref()) {
+                (Expression::IntLiteral(_, v1), Expression::IntLiteral(_, v2)) => {
+                    assert_eq!(*v1, 0);
+                    assert_eq!(*v2, 1);
+                },
+                _ => panic!()
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
     fn bop_prec1() {
         // Stream
         let s = "fun main() -> i8 { return 1 + 2 * 3; }".to_string();
