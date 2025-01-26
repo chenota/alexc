@@ -484,4 +484,20 @@ mod typesolver_tests {
         // Return
         ()
     }
+    #[test]
+    fn leterr1() {
+        // Expression to determine type of
+        let e = Expression::VariableExpression(
+            "x".to_string()
+        );
+        // Empty program
+        let p = Parser::new("let x: bool = 0;".to_string()).parse().unwrap();
+        // Read in statements
+        match TypeSolver::new(&p) {
+            Err(_) => (),
+            _ => panic!()
+        };
+        // Return
+        ()
+    }
 }
