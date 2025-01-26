@@ -1,6 +1,6 @@
 use std::cmp::{PartialOrd, Ordering};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Type {
     Int(u8)
 }

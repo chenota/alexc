@@ -2,6 +2,7 @@
 
 mod parser_tests {
     use crate::parser::parser::*;
+    use crate::typecheck::typecheck::*;
 
     #[test]
     fn var1() {
@@ -315,6 +316,30 @@ mod parser_tests {
             Statement::ReturnStatement(Expression::CallExpression(s, args)) => {
                 assert_eq!(s, "g");
                 assert_eq!(args.len(), 3)
+            },
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
+    #[test]
+    fn as_expr() {
+        // Stream
+        let s = "fun main() -> i8 { return 0 as i8; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2[0] {
+            Statement::ReturnStatement(Expression::AsExpression(e, t)) => {
+                assert_eq!(*t, Type::Int(3));
+                match e.as_ref() {
+                    Expression::IntLiteral(_, x) => assert_eq!(*x, 0),
+                    _ => panic!()
+                }
             },
             _ => panic!()
         }
