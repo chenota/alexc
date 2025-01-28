@@ -26,7 +26,7 @@ impl PartialOrd for Type {
     }
 }
 
-fn synth_int(sign: bool, magnitude: usize) -> Result<Type, String> {
+pub fn synth_int(sign: bool, magnitude: usize) -> Result<Type, String> {
     // Return OK Int by default
     Ok(Type::Int(if sign {
         if magnitude <= (i8::MAX as usize) { 3 }
