@@ -11,7 +11,11 @@ mod typecheck_tests {
         assert!(Type::Int(5) <= Type::Int(5))
     }
     #[test]
-    fn intsynth() {
-        assert_eq!(synth_int(false, 250).unwrap(), Type::Int(3))
+    fn intsynth1() {
+        assert_eq!(synth_int(false, 127).unwrap(), Type::Int(3))
+    }
+    #[test]
+    fn intsynth2() {
+        assert_eq!(synth_int(true, 32768).unwrap(), Type::Int(4))
     }
 }
