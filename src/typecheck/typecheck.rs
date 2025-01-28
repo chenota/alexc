@@ -36,9 +36,9 @@ fn synth_int(sign: bool, magnitude: usize) -> Result<Type, String> {
         else { return Err("Int literal too large".to_string()) }
     } else {
         if magnitude <= (i8::MIN.abs() as usize) { 3 }
-        else if magnitude <= (i16::MAX.abs() as usize) { 4 }
-        else if magnitude <= (i32::MAX.abs() as usize) { 5 }
-        else if magnitude <= (i64::MAX.abs() as usize) { 6 }
+        else if magnitude <= (i16::MIN.abs() as usize) { 4 }
+        else if magnitude <= (i32::MIN.abs() as usize) { 5 }
+        else if magnitude <= (i64::MIN.abs() as usize) { 6 }
         else { return Err("Int literal too large".to_string()) }
     }))
 }
