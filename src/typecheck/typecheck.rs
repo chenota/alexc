@@ -1,4 +1,5 @@
 use std::cmp::{PartialOrd, Ordering};
+use std::usize;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -23,4 +24,21 @@ impl PartialOrd for Type {
             _ => None
         }
     }
+}
+
+fn synth_int(sign: bool, magnitude: usize) -> Result<Type, String> {
+    // Return OK Int by default
+    Ok(Type::Int(if sign {
+        if magnitude <= (i8::MAX as usize) { 3 }
+        else if magnitude <= (i16::MAX as usize) { 4 }
+        else if magnitude <= (i32::MAX as usize) { 5 }
+        else if magnitude <= (i64::MAX as usize) { 6 }
+        else { return Err("Int literal too large".to_string()) }
+    } else {
+        if magnitude <= (i8::MIN.abs() as usize) { 3 }
+        else if magnitude <= (i16::MAX.abs() as usize) { 4 }
+        else if magnitude <= (i32::MAX.abs() as usize) { 5 }
+        else if magnitude <= (i64::MAX.abs() as usize) { 6 }
+        else { return Err("Int literal too large".to_string()) }
+    }))
 }
