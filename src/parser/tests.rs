@@ -16,7 +16,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::VariableExpression(v)) => assert_eq!(v, "x"),
+            (StatementBody::ReturnStatement((ExpressionBody::VariableExpression(v), _)), _) => assert_eq!(v, "x"),
             _ => panic!()
         }
         // Return
@@ -34,7 +34,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(_, v)) => assert_eq!(*v, 100),
+            (StatementBody::ReturnStatement((ExpressionBody::IntLiteral(_, v), _)), _) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return
@@ -52,7 +52,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(_, v)) => assert_eq!(*v, 100),
+            (StatementBody::ReturnStatement((ExpressionBody::IntLiteral(_, v), _)), _) => assert_eq!(*v, 100),
             _ => panic!()
         }
         // Return
@@ -70,7 +70,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(s, v)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::IntLiteral(s, v), _)), _) => {
                 assert_eq!(*v, 100);
                 assert!(s)
             },
@@ -91,7 +91,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::IntLiteral(s, v)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::IntLiteral(s, v), _)), _) => {
                 assert_eq!(*v, 100);
                 assert!(!s)
             },
@@ -112,7 +112,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::PlusBop, _, _), _)), _) => (),
             _ => panic!()
         }
         // Return
@@ -130,7 +130,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::MinusBop, _, _)) => (),
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::MinusBop, _, _), _)), _) => (),
             _ => panic!()
         }
         // Return
@@ -148,8 +148,8 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::MinusBop, _, b)) => match b.as_ref() {
-                Expression::IntLiteral(s, v) => {
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::MinusBop, _, b), _)), _) => match b.as_ref() {
+                (ExpressionBody::IntLiteral(s, v), _) => {
                     assert!(*s);
                     assert_eq!(*v, 1);
                 },
@@ -172,8 +172,8 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::TimesBop, b1, b2)) => match (b1.as_ref(), b2.as_ref()) {
-                (Expression::IntLiteral(_, v1), Expression::IntLiteral(_, v2)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::TimesBop, b1, b2), _)), _) => match (b1.as_ref(), b2.as_ref()) {
+                ((ExpressionBody::IntLiteral(_, v1), _), (ExpressionBody::IntLiteral(_, v2), _)) => {
                     assert_eq!(*v1, 0);
                     assert_eq!(*v2, 1);
                 },
@@ -196,7 +196,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::PlusBop, _, _), _)), _) => (),
             _ => panic!()
         }
         // Return
@@ -214,7 +214,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::BopExpression(Bop::PlusBop, _, _)) => (),
+            (StatementBody::ReturnStatement((ExpressionBody::BopExpression(Bop::PlusBop, _, _), _)), _) => (),
             _ => panic!()
         }
         // Return
@@ -232,7 +232,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::LetStmt((s, None), Expression::IntLiteral(_, x)) => {
+            (StatementBody::LetStmt((s, None), (ExpressionBody::IntLiteral(_, x), _)), _) => {
                 assert_eq!(*x, 0);
                 assert_eq!(s, "x")
             },
@@ -253,7 +253,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[1] {
-            Statement::AssignStmt(s, Expression::IntLiteral(_, x)) => {
+            (StatementBody::AssignStmt(s, (ExpressionBody::IntLiteral(_, x), _)), _) => {
                 assert_eq!(*x, 1);
                 assert_eq!(s, "x")
             },
@@ -274,7 +274,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::UopExpression(Uop::NegUop, _)) => (),
+            (StatementBody::ReturnStatement((ExpressionBody::UopExpression(Uop::NegUop, _), _)), _) => (),
             _ => panic!()
         }
         // Return
@@ -292,7 +292,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::CallExpression(s, args)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::CallExpression(s, args), _)), _) => {
                 assert_eq!(s, "g");
                 assert_eq!(args.len(), 0)
             },
@@ -313,7 +313,7 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::CallExpression(s, args)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::CallExpression(s, args), _)), _) => {
                 assert_eq!(s, "g");
                 assert_eq!(args.len(), 3)
             },
@@ -334,10 +334,10 @@ mod parser_tests {
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2[0] {
-            Statement::ReturnStatement(Expression::AsExpression(e, t)) => {
+            (StatementBody::ReturnStatement((ExpressionBody::AsExpression(e, t), _)), _) => {
                 assert_eq!(*t, Type::Int(3));
                 match e.as_ref() {
-                    Expression::IntLiteral(_, x) => assert_eq!(*x, 0),
+                    (ExpressionBody::IntLiteral(_, x), _) => assert_eq!(*x, 0),
                     _ => panic!()
                 }
             },

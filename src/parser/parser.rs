@@ -3,17 +3,19 @@ use crate::typecheck::typecheck::*;
 use std::collections::HashMap;
 
 pub type Program = (HashMap<Ident, Function>);
-pub type Function = (ForceTypedIdentList, Type, StmtList);
+pub type Function = (ForceTypedIdentList, Type, StmtList, Location);
 
-pub enum Statement {
+pub enum StatementBody {
     ExprStatement(Expression),
     ReturnStatement(Expression),
     LetStmt(TypedIdent, Expression),
     AssignStmt(Ident, Expression),
 }
 
+pub type Statement = (StatementBody, Location);
+
 #[derive(Clone)]
-pub enum Expression {
+pub enum ExpressionBody {
     UopExpression(Uop, Box<Expression>),
     BopExpression(Bop, Box<Expression>, Box<Expression>),
     IntLiteral(bool, usize),
@@ -21,6 +23,8 @@ pub enum Expression {
     CallExpression(Ident, ExprList),
     AsExpression(Box<Expression>, Type)
 }
+
+pub type Expression = (ExpressionBody, Location);
 
 #[derive(Clone)]
 pub enum Uop {
@@ -44,6 +48,8 @@ pub type TypedIdentList = Vec<TypedIdent>;
 pub type ForceTypedIdentList = Vec<ForceTypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
+
+pub type Location = (usize, usize);
 
 const ARITH_PLUS: [(TokenType, Bop); 2] = [
     (TokenType::Plus, Bop::PlusBop),
@@ -151,7 +157,10 @@ impl Parser {
     }
     fn function(&mut self) -> Result<Option<(String, Function)>, String> {
         // Check for function keyword
-        if self.expect(TokenType::FunKw)?.is_none() { return Ok(None) }
+        let loc = match self.expect(TokenType::FunKw)? {
+            Some((_, _, loc)) => loc.clone(),
+            None => return Ok(None)
+        };
         // Extract ident
         let id = match self.expect_err(TokenType::Identifier)? {
             (_, TokenValue::String(s), _) => s.clone(),
@@ -181,13 +190,15 @@ impl Parser {
         // Expect closing bracket
         self.expect_err(TokenType::RBracket)?;
         // Return
-        Ok(Some((id, (idlist, ret_type, stmts))))
+        Ok(Some((id, (idlist, ret_type, stmts, loc))))
     }
     fn statement(&mut self) -> Result<Option<Statement>, String> {
         // Mark position
         let pos = self.mark();
-        // Skip to next next token for lookahead
-        self.tokenizer.get_token()?;
+        // Skip to next token for lookahead and save location of statement
+        let loc = match self.tokenizer.get_token()? {
+            (_, _, loc) => loc.clone()
+        };
         // Check if next is an equal sign (in case ... = ... if so)
         if self.expect(TokenType::Equal)?.is_some() {
             // Reset pos
@@ -207,7 +218,7 @@ impl Parser {
             // Expect a semicolon
             self.expect_err(TokenType::Semi)?;
             // Put together and return
-            return Ok(Some(Statement::AssignStmt(id, ex)))
+            return Ok(Some((StatementBody::AssignStmt(id, ex), loc)))
         };
         // Reset position
         self.reset(pos);
@@ -228,7 +239,7 @@ impl Parser {
             // Expect a semicolon
             self.expect_err(TokenType::Semi)?;
             // Put together and return
-            return Ok(Some(Statement::LetStmt(tid, e)))
+            return Ok(Some((StatementBody::LetStmt(tid, e), loc)))
         };
         // Check for return keyword
         if self.expect(TokenType::ReturnKw)?.is_some() {
@@ -238,7 +249,7 @@ impl Parser {
                     // Expect a semicolon
                     self.expect_err(TokenType::Semi)?;
                     // Return
-                    return Ok(Some(Statement::ReturnStatement(e)))
+                    return Ok(Some((StatementBody::ReturnStatement(e), loc)))
                 },
                 None => return Err(self.expected_err("Expression"))
             }
@@ -249,7 +260,7 @@ impl Parser {
                 // Expect a semicolon
                 self.expect_err(TokenType::Semi)?;
                 // Return
-                Ok(Some(Statement::ExprStatement(e)))
+                Ok(Some((StatementBody::ExprStatement(e), loc)))
             },
             None => {
                 // Reset position
@@ -295,7 +306,7 @@ impl Parser {
         // Create left-associative list and return
         Ok(Some(elist.drain(..).fold(
             head,
-            |acc, bop| Expression::BopExpression(bop.0, Box::new(acc), Box::new(bop.1))
+            |acc, bop| (ExpressionBody::BopExpression(bop.0, Box::new(acc.clone()), Box::new(bop.1)), acc.1)
         )))
     }
     fn expression(&mut self) -> Result<Option<Expression>, String> {
@@ -324,25 +335,28 @@ impl Parser {
         // Create left-associative list and return
         Ok(Some(tlist.drain(..).fold(
             head,
-            |acc, t| Expression::AsExpression(Box::new(acc), t)
+            |acc, t| (ExpressionBody::AsExpression(Box::new(acc.clone()), t), acc.1)
         )))
     }
     fn e3(&mut self) -> Result<Option<Expression>, String> {
         // Check for negative sign
-        if self.expect(TokenType::Minus)?.is_some() {
-            // Parse expression
-            return match self.e3()? {
-                Some(e) => {
-                    // Check type of expression
-                    match e {
-                        // Int literal, flip sign
-                        Expression::IntLiteral(sign, magnitude) => Ok(Some(Expression::IntLiteral(!sign, magnitude))),
-                        // Anything else, create uop expression
-                        _ => Ok(Some(Expression::UopExpression(Uop::NegUop, Box::new(e))))
-                    }
-                },
-                None => Err(self.expected_err("Expression"))
-            };
+        match self.expect(TokenType::Minus)?.cloned() {
+            Some((_, _, loc)) => {
+                // Parse expression
+                return match self.e3()? {
+                    Some(e) => {
+                        // Check type of expression
+                        match e {
+                            // Int literal, flip sign
+                            (ExpressionBody::IntLiteral(sign, magnitude), _) => Ok(Some((ExpressionBody::IntLiteral(!sign, magnitude), loc))),
+                            // Anything else, create uop expression
+                            _ => Ok(Some((ExpressionBody::UopExpression(Uop::NegUop, Box::new(e)), loc)))
+                        }
+                    },
+                    None => Err(self.expected_err("Expression"))
+                };
+            },
+            None => ()
         };
         // Parse e4
         self.e4()
@@ -356,8 +370,8 @@ impl Parser {
         // Check for open paren
         if self.expect(TokenType::LParen)?.is_some() {
             // Check if e is an identifier
-            let vstr = match v {
-                Expression::VariableExpression(s) => s,
+            let (vstr, loc) = match v {
+                (ExpressionBody::VariableExpression(s), loc) => (s, loc),
                 _ => return Err(self.generic_err("Cannot call a non-function"))
             };
             // Parse expression list
@@ -365,7 +379,7 @@ impl Parser {
             // Expect right paren
             self.expect_err(TokenType::RParen)?;
             // Return
-            return Ok(Some(Expression::CallExpression(vstr, elist)))
+            return Ok(Some((ExpressionBody::CallExpression(vstr, elist), loc)))
         };
         // Return value
         Ok(Some(v))
@@ -383,16 +397,19 @@ impl Parser {
             // Return e
             return Ok(Some(e));
         };
+        // Get current location for single-token values
+        let loc = self.tokenizer.peek_token()?.2.clone();
         // Check for ident
         match self.expect(TokenType::Identifier)? {
-            Some((_, TokenValue::String(x), _)) => return Ok(Some(Expression::VariableExpression(x.clone()))),
+            Some((_, TokenValue::String(x), _)) => return Ok(Some((ExpressionBody::VariableExpression(x.clone()), loc))),
             _ => ()
         };
         // Check for integer literal
         match self.expect(TokenType::Integer)? {
-            Some((_, TokenValue::Integer(x), _)) => return Ok(Some(Expression::IntLiteral(false, x.clone()))),
+            Some((_, TokenValue::Integer(x), _)) => return Ok(Some((ExpressionBody::IntLiteral(false, x.clone()), loc))),
             _ => ()
         };
+        // No value matched
         Ok(None)
     }
     fn stmtlist(&mut self) -> Result<StmtList, String> {

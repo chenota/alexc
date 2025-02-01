@@ -42,6 +42,7 @@ impl std::fmt::Display for TokenType {
 }
 
 // Token value
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenValue {
     Integer(usize),
     String(String),
