@@ -1,8 +1,8 @@
 use crate::lexer::lexer::*;
-use crate::typecheck::typecheck::*;
+use crate::typecheck::typecheck::Type;
 use std::collections::HashMap;
 
-pub type Program = (HashMap<Ident, Function>);
+pub type Program = HashMap<Ident, Function>;
 pub type Function = (ForceTypedIdentList, Type, StmtList, Location);
 
 pub enum StatementBody {

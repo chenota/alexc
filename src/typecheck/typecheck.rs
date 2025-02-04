@@ -1,5 +1,7 @@
 use std::cmp::{PartialOrd, Ordering};
 use std::usize;
+use crate::parser::parser::*;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -26,27 +28,58 @@ impl PartialOrd for Type {
     }
 }
 
-pub fn synth_int(sign: bool, magnitude: usize) -> Result<Type, String> {
-    // Return OK Int by default
-    Ok(Type::Int(
-        // If number is positive
-        if !sign {
-            // Check smallest type that fits
-            if magnitude <= (i8::MAX as usize) { 3 }
-            else if magnitude <= (i16::MAX as usize) { 4 }
-            else if magnitude <= (i32::MAX as usize) { 5 }
-            else if magnitude <= (i64::MAX as usize) { 6 }
-            else { return Err("Int literal too large".to_string()) }
-        } 
-        // Number is negative
-        else {
-            // Check largest negative type that fits
-            // Since 2's compliment, largest negative = largest positive + 1
-            if magnitude <= (i8::MAX as usize + 1) { 3 }
-            else if magnitude <= (i16::MAX as usize + 1) { 4 }
-            else if magnitude <= (i32::MAX as usize + 1) { 5 }
-            else if magnitude <= (i64::MAX as usize + 1) { 6 }
-            else { return Err("Int literal too large".to_string()) }
+pub struct TypeContext {
+    fnmap: HashMap<String, (Vec<Type>, Type)>,
+}
+impl TypeContext {
+    pub fn get_fn(&self, s: &String) -> Option<&(Vec<Type>, Type)> {
+        self.fnmap.get(s)
+    }
+}
+
+pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
+    match e.0 {
+        ExpressionBody::IntLiteral(s, m) => {
+            // Return OK Int by default
+            Ok(Type::Int(
+                // If number is positive
+                if !s {
+                    // Check smallest type that fits
+                    if m <= (i8::MAX as usize) { 3 }
+                    else if m <= (i16::MAX as usize) { 4 }
+                    else if m <= (i32::MAX as usize) { 5 }
+                    else if m <= (i64::MAX as usize) { 6 }
+                    else { return Err("Int literal too large".to_string()) }
+                } 
+                // Number is negative
+                else {
+                    // Check largest negative type that fits
+                    // Since 2's compliment, largest negative = largest positive + 1
+                    if m <= (i8::MAX as usize + 1) { 3 }
+                    else if m <= (i16::MAX as usize + 1) { 4 }
+                    else if m <= (i32::MAX as usize + 1) { 5 }
+                    else if m <= (i64::MAX as usize + 1) { 6 }
+                    else { return Err("Int literal too large".to_string()) }
+                }
+            ))
+        },
+        ExpressionBody::CallExpression(f, args) => {
+            // Get function input and output types
+            let ftype = match c.get_fn(&f) {
+                Some(x) => x,
+                _ => panic!()
+            };
+            // Check that same number of args as parameters
+            if args.len() != ftype.0.len() { panic!() };
+            // Check that arguments have correct type
+            ()
         }
-    ))
+        _ => panic!()
+    }
+}
+
+pub fn check_type(t: &Type, c: &TypeContext, e: &Expression) -> Result<Type, String> {
+    match e {
+
+    }
 }
