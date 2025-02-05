@@ -98,6 +98,17 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
             };
             // Return output type of function
             Ok(ftype.1.clone())
+        },
+        ExpressionBody::BopExpression(_, e1, e2) => {
+            // Synth types for e1 and e2
+            let e1_type = synth_type(c, e1.as_ref())?;
+            let e2_type = synth_type(c, e2.as_ref())?;
+            // Return most general type
+            if e1_type > e2_type {
+                Ok(e1_type)
+            } else {
+                Ok(e2_type)
+            }
         }
         _ => panic!()
     }
