@@ -37,6 +37,10 @@ impl TypeContext {
     }
 }
 
+fn type_error(msg: String, loc: &(usize, usize)) -> String {
+    "Type Error at ".to_string() + &loc.0.to_string() + ":" + &loc.1.to_string() + ": " + &msg
+}
+
 pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
     match e.0 {
         ExpressionBody::IntLiteral(s, m) => {
@@ -49,7 +53,7 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
                     else if m <= (i16::MAX as usize) { 4 }
                     else if m <= (i32::MAX as usize) { 5 }
                     else if m <= (i64::MAX as usize) { 6 }
-                    else { return Err("Int literal too large".to_string()) }
+                    else { return Err(type_error("Int literal too large".to_string(), &e.1)) }
                 } 
                 // Number is negative
                 else {
@@ -59,7 +63,7 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
                     else if m <= (i16::MAX as usize + 1) { 4 }
                     else if m <= (i32::MAX as usize + 1) { 5 }
                     else if m <= (i64::MAX as usize + 1) { 6 }
-                    else { return Err("Int literal too large".to_string()) }
+                    else { return Err(type_error("Int literal too large".to_string(), &e.1)) }
                 }
             ))
         },
@@ -67,10 +71,12 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
             // Get function input and output types
             let ftype = match c.get_fn(&f) {
                 Some(x) => x,
-                _ => panic!()
+                _ => return Err(type_error("Function does not exist: ".to_string() + &f, &e.1))
             };
             // Check that same number of args as parameters
-            if args.len() != ftype.0.len() { panic!() };
+            if args.len() != ftype.0.len() { 
+                return Err(type_error("Invalid function call: ".to_string() + &f, &e.1)) 
+            };
             // Check that arguments have correct type
             ()
         }
