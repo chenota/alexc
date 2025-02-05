@@ -32,6 +32,9 @@ pub struct TypeContext {
     fnmap: HashMap<String, (Vec<Type>, Type)>,
 }
 impl TypeContext {
+    pub fn new() -> TypeContext {
+        TypeContext { fnmap: HashMap::new() }
+    }
     pub fn get_fn(&self, s: &String) -> Option<&(Vec<Type>, Type)> {
         self.fnmap.get(s)
     }

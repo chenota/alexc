@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod typecheck_tests {
     use crate::typecheck::typecheck::*;
+    use crate::parser::parser::ExpressionBody;
 
     #[test]
     fn intord1() {
@@ -12,10 +13,20 @@ mod typecheck_tests {
     }
     #[test]
     fn intsynth1() {
-        assert_eq!(synth_int(false, 127).unwrap(), Type::Int(3))
+        // Create new type context
+        let c = TypeContext::new();
+        // Create new expression
+        let e = (ExpressionBody::IntLiteral(false, 127), (0, 0));
+        // Sytnthesize type
+        assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(3))
     }
     #[test]
     fn intsynth2() {
-        assert_eq!(synth_int(true, 32768).unwrap(), Type::Int(4))
+        // Create new type context
+        let c = TypeContext::new();
+        // Create new expression
+        let e = (ExpressionBody::IntLiteral(false, 32766), (0, 0));
+        // Sytnthesize type
+        assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(4))
     }
 }
