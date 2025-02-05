@@ -109,11 +109,19 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
             } else {
                 Ok(e2_type)
             }
-        }
+        },
+        ExpressionBody::AsExpression(e1, t) => {
+            // Synthesize type for e1
+            let e1_type = synth_type(c, e1.as_ref())?;
+            // Check that e1 is a subtype of t
+            if e1_type > *t { return Err(type_error("Invalid typecast".to_string(), &e1.as_ref().1)) };
+            // Return t
+            Ok(t.clone())
+        },
         _ => panic!()
     }
 }
 
-pub fn check_type(t: &Type, c: &TypeContext, e: &Expression) -> Result<Type, String> {
-    Ok(Type::Int(0))
+pub fn check_type(t: &Type, c: &TypeContext, e: &Expression) -> Result<bool, String> {
+    Ok(true)
 }
