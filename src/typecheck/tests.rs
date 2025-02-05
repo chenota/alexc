@@ -143,4 +143,25 @@ mod typecheck_tests {
         // Sytnthesize type
         assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(4))
     }
+    #[test]
+    fn as1() {
+        // Stream
+        let s = "fun f(x: i8) -> i8 { return x; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Create new type context
+        let c = TypeContext::new(&x);
+        // Create new expression
+        let e = (
+            ExpressionBody::AsExpression(
+                Box::new((ExpressionBody::IntLiteral(false, 1), (0, 0))),
+                Type::Int(4)
+            ), 
+            (0, 0)
+        );
+        // Sytnthesize type
+        assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(4))
+    }
 }
