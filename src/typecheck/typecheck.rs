@@ -32,8 +32,18 @@ pub struct TypeContext {
     fnmap: HashMap<String, (Vec<Type>, Type)>,
 }
 impl TypeContext {
-    pub fn new() -> TypeContext {
-        TypeContext { fnmap: HashMap::new() }
+    pub fn new(prog: &Program) -> TypeContext {
+        // Create map for function types
+        let mut fnmap = HashMap::new();
+        // Add function types to map
+        for (key, value) in prog {
+            fnmap.insert(
+                key.clone(), 
+                (value.0.iter().map(|r| r.1.clone()).collect(), value.1.clone())
+            );
+        }
+        // Return context
+        TypeContext { fnmap }
     }
     pub fn get_fn(&self, s: &String) -> Option<&(Vec<Type>, Type)> {
         self.fnmap.get(s)
