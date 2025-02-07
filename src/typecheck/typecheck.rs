@@ -127,5 +127,13 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
 }
 
 pub fn check_type(t: &Type, c: &TypeContext, e: &Expression) -> Result<bool, String> {
-    Ok(true)
+    match &e.0 {
+        ExpressionBody::IntLiteral(_, _) => {
+            // Synthesize type for integer
+            let t_synth = synth_type(c, e)?;
+            // Check that synthesized type is a subtype of t
+            Ok(t_synth <= *t)
+        },
+        _ => panic!()
+    }
 }
