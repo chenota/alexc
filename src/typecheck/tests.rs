@@ -164,4 +164,32 @@ mod typecheck_tests {
         // Sytnthesize type
         assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(4))
     }
+    #[test]
+    fn mix1() {
+        // Stream
+        let s = "fun f(x: i8) -> i8 { return x; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap();
+        // Create new type context
+        let c = TypeContext::new(&x);
+        // Create new expression
+        let e = (
+            ExpressionBody::BopExpression(
+                Bop::TimesBop,
+                Box::new((
+                    ExpressionBody::CallExpression("f".to_string(), vec![ (ExpressionBody::IntLiteral(false, 0), (0, 0)) ]), 
+                    (0, 0)
+                )),
+                Box::new((
+                    ExpressionBody::IntLiteral(false, 1000),
+                    (0, 0)
+                ))
+            ),
+            (0, 0)
+        );
+        // Sytnthesize type
+        assert_eq!(synth_type(&c, &e).unwrap(), Type::Int(4))
+    }
 }
