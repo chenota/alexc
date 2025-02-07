@@ -116,6 +116,12 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
             // Return t
             Ok(t.clone())
         },
+        ExpressionBody::UopExpression(_, e1) => {
+            // Synth type for e1
+            let e1_type = synth_type(c, e1.as_ref());
+            // Return
+            e1_type
+        }
         _ => panic!()
     }
 }
