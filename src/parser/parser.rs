@@ -1,6 +1,11 @@
 use crate::lexer::lexer::*;
-use crate::typecheck::typecheck::Type;
 use std::collections::HashMap;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Type {
+    Int,
+    Float
+}
 
 pub type Program = HashMap<Ident, Function>;
 pub type Function = (ForceTypedIdentList, Type, StmtList, Location);
@@ -521,10 +526,8 @@ impl Parser {
         let first = match self.expect(TokenType::Identifier)? {
             Some((_, TokenValue::String(s), _)) => {
                 match s.as_str() {
-                    "i64" => Type::Int(6),
-                    "i32" => Type::Int(5),
-                    "i16" => Type::Int(4),
-                    "i8" => Type::Int(3),
+                    "int" => Type::Int,
+                    "flt" => Type::Float,
                     _ => return Err(self.expected_err("Type"))
                 }
             },

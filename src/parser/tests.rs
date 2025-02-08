@@ -2,12 +2,11 @@
 
 mod parser_tests {
     use crate::parser::parser::*;
-    use crate::typecheck::typecheck::*;
 
     #[test]
     fn var1() {
         // Stream
-        let s = "fun main() -> i8 { return x; }".to_string();
+        let s = "fun main() -> int { return x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -25,7 +24,7 @@ mod parser_tests {
     #[test]
     fn int1() {
         // Stream
-        let s = "fun main() -> i8 { return 100; }".to_string();
+        let s = "fun main() -> int { return 100; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -43,7 +42,7 @@ mod parser_tests {
     #[test]
     fn int2() {
         // Stream
-        let s = "fun main() -> i8 { return (100); }".to_string();
+        let s = "fun main() -> int { return (100); }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -61,7 +60,7 @@ mod parser_tests {
     #[test]
     fn int3() {
         // Stream
-        let s = "fun main() -> i8 { return -100; }".to_string();
+        let s = "fun main() -> int { return -100; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -82,7 +81,7 @@ mod parser_tests {
     #[test]
     fn int4() {
         // Stream
-        let s = "fun main() -> i8 { return --100; }".to_string();
+        let s = "fun main() -> int { return --100; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -103,7 +102,7 @@ mod parser_tests {
     #[test]
     fn bop1() {
         // Stream
-        let s = "fun main() -> i8 { return 1+1; }".to_string();
+        let s = "fun main() -> int { return 1+1; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -121,7 +120,7 @@ mod parser_tests {
     #[test]
     fn bop2() {
         // Stream
-        let s = "fun main() -> i8 { return 1-1; }".to_string();
+        let s = "fun main() -> int { return 1-1; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -139,7 +138,7 @@ mod parser_tests {
     #[test]
     fn bop3() {
         // Stream
-        let s = "fun main() -> i8 { return 1 - -1; }".to_string();
+        let s = "fun main() -> int { return 1 - -1; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -163,7 +162,7 @@ mod parser_tests {
     #[test]
     fn bop4() {
         // Stream
-        let s = "fun main() -> i8 { return 0 * 1; }".to_string();
+        let s = "fun main() -> int { return 0 * 1; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -187,7 +186,7 @@ mod parser_tests {
     #[test]
     fn bop_prec1() {
         // Stream
-        let s = "fun main() -> i8 { return 1 + 2 * 3; }".to_string();
+        let s = "fun main() -> int { return 1 + 2 * 3; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -205,7 +204,7 @@ mod parser_tests {
     #[test]
     fn bop_prec2() {
         // Stream
-        let s = "fun main() -> i8 { return 2 * 3 + 1; }".to_string();
+        let s = "fun main() -> int { return 2 * 3 + 1; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -223,7 +222,7 @@ mod parser_tests {
     #[test]
     fn let_stmt() {
         // Stream
-        let s = "fun main() -> i8 { let x = 0; return x; }".to_string();
+        let s = "fun main() -> int { let x = 0; return x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -244,7 +243,7 @@ mod parser_tests {
     #[test]
     fn assign_stmt() {
         // Stream
-        let s = "fun main() -> i8 { let x = 0; x = 1; return x; }".to_string();
+        let s = "fun main() -> int { let x = 0; x = 1; return x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -265,7 +264,7 @@ mod parser_tests {
     #[test]
     fn uop1() {
         // Stream
-        let s = "fun main() -> i8 { return -x; }".to_string();
+        let s = "fun main() -> int { return -x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -283,7 +282,7 @@ mod parser_tests {
     #[test]
     fn call1() {
         // Stream
-        let s = "fun main() -> i8 { return g(); }".to_string();
+        let s = "fun main() -> int { return g(); }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -304,7 +303,7 @@ mod parser_tests {
     #[test]
     fn call2() {
         // Stream
-        let s = "fun main() -> i8 { return g(1, 2, 3); }".to_string();
+        let s = "fun main() -> int { return g(1, 2, 3); }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -325,7 +324,7 @@ mod parser_tests {
     #[test]
     fn as_expr() {
         // Stream
-        let s = "fun main() -> i8 { return 0 as i8; }".to_string();
+        let s = "fun main() -> int { return 0 as int; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
@@ -335,7 +334,7 @@ mod parser_tests {
         // Check values
         match &mainfn.2[0] {
             (StatementBody::ReturnStatement((ExpressionBody::AsExpression(e, t), _)), _) => {
-                assert_eq!(*t, Type::Int(3));
+                assert_eq!(*t, Type::Int);
                 match e.as_ref() {
                     (ExpressionBody::IntLiteral(_, x), _) => assert_eq!(*x, 0),
                     _ => panic!()
@@ -349,7 +348,7 @@ mod parser_tests {
     #[test]
     fn fn_no_paren() {
         // Stream
-        let s = "fun main -> i8 { return 0; }".to_string();
+        let s = "fun main -> int { return 0; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
