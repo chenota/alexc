@@ -15,6 +15,8 @@ pub enum StatementBody {
     ReturnStatement(Expression),
     LetStmt(TypedIdent, Expression),
     AssignStmt(Ident, Expression),
+    IfStmt(Expression, StmtList, StmtList),
+    WhileStmt(Expression, StmtList)
 }
 
 pub type Statement = (StatementBody, Location);
@@ -258,6 +260,49 @@ impl Parser {
                 None => return Err(self.expected_err("Expression"))
             }
         };
+        // Check for if keyword
+        if self.expect(TokenType::IfKw)?.is_some() {
+            // Parse an expression
+            let cond = match self.expression()? {
+                Some(e) => e,
+                None => return Err(self.expected_err("Expression"))
+            };
+            // Expect open bracket
+            self.expect_err(TokenType::LBracket)?;
+            // Parse statement list
+            let ifbody = self.stmtlist()?;
+            // Expect close bracket
+            self.expect_err(TokenType::RBracket)?;
+            // Check if else keyword
+            let elsebody = if self.expect(TokenType::ElseKw)?.is_some() {
+                // Parse else body
+                self.expect_err(TokenType::LBracket)?;
+                let sl = self.stmtlist()?;
+                self.expect_err(TokenType::RBracket)?;
+                sl
+            } else {
+                // Return empty body
+                Vec::new()
+            };
+            // Put together if statement
+            return Ok(Some((StatementBody::IfStmt(cond, ifbody, elsebody), loc)))
+        }
+        // Check for while keyword
+        if self.expect(TokenType::WhileKw)?.is_some() {
+            // Parse an expression
+            let cond = match self.expression()? {
+                Some(e) => e,
+                None => return Err(self.expected_err("Expression"))
+            };
+            // Expect open bracket
+            self.expect_err(TokenType::LBracket)?;
+            // Parse statement list
+            let whilebody = self.stmtlist()?;
+            // Expect close bracket
+            self.expect_err(TokenType::RBracket)?;
+            // Put together while statement
+            return Ok(Some((StatementBody::WhileStmt(cond, whilebody), loc)))
+        }
         // Attempt to parse expression
         match self.expression()? {
             Some(e) => {
