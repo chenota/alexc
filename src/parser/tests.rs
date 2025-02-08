@@ -322,30 +322,6 @@ mod parser_tests {
         ()
     }
     #[test]
-    fn as_expr() {
-        // Stream
-        let s = "fun main() -> int { return 0 as int; }".to_string();
-        // Token generator
-        let mut p = Parser::new(s);
-        // Parse
-        let x = p.parse().unwrap();
-        // Get main function from program
-        let mainfn = x.get(&"main".to_string()).unwrap();
-        // Check values
-        match &mainfn.2[0] {
-            (StatementBody::ReturnStatement((ExpressionBody::AsExpression(e, t), _)), _) => {
-                assert_eq!(*t, Type::Int);
-                match e.as_ref() {
-                    (ExpressionBody::IntLiteral(_, x), _) => assert_eq!(*x, 0),
-                    _ => panic!()
-                }
-            },
-            _ => panic!()
-        }
-        // Return
-        ()
-    }
-    #[test]
     fn fn_no_paren() {
         // Stream
         let s = "fun main -> int { return 0; }".to_string();

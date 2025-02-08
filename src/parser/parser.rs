@@ -25,8 +25,7 @@ pub enum ExpressionBody {
     BopExpression(Bop, Box<Expression>, Box<Expression>),
     IntLiteral(bool, usize),
     VariableExpression(Ident),
-    CallExpression(Ident, ExprList),
-    AsExpression(Box<Expression>, Type)
+    CallExpression(Ident, ExprList)
 }
 
 pub type Expression = (ExpressionBody, Location);
@@ -321,34 +320,11 @@ impl Parser {
         self.parse_bop_expr(Self::e2, &ARITH_TIMES)
     }
     fn e2(&mut self) -> Result<Option<Expression>, String> {
-        // Parse an e3
-        let head = match self.e3()? {
-            Some(e) => e,
-            None => return Ok(None)
-        };
-        // Create list of types
-        let mut tlist = Vec::new();
-        // Consume 'as', <expr> pairs
-        loop {
-            // Break if no as keyword
-            if self.expect(TokenType::AsKw)?.is_none() { break }
-            // Consume a type
-            let t = self.parse_type()?;
-            // Push to list
-            tlist.push(t)
-        };
-        // Create left-associative list and return
-        Ok(Some(tlist.drain(..).fold(
-            head,
-            |acc, t| (ExpressionBody::AsExpression(Box::new(acc.clone()), t), acc.1)
-        )))
-    }
-    fn e3(&mut self) -> Result<Option<Expression>, String> {
         // Check for negative sign
         match self.expect(TokenType::Minus)?.cloned() {
             Some((_, _, loc)) => {
                 // Parse expression
-                return match self.e3()? {
+                return match self.e2()? {
                     Some(e) => {
                         // Check type of expression
                         match e {
@@ -363,10 +339,10 @@ impl Parser {
             },
             None => ()
         };
-        // Parse e4
-        self.e4()
+        // Parse e3
+        self.e3()
     }
-    fn e4(&mut self) -> Result<Option<Expression>, String> {
+    fn e3(&mut self) -> Result<Option<Expression>, String> {
         // Parse value, return none if not found
         let v = match self.value()? {
             Some(v) => v,
