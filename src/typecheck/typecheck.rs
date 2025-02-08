@@ -30,6 +30,7 @@ impl PartialOrd for Type {
 
 pub struct TypeContext {
     fnmap: HashMap<String, (Vec<Type>, Type)>,
+    vmap: HashMap<String, Type>
 }
 impl TypeContext {
     pub fn new(prog: &Program) -> TypeContext {
@@ -43,10 +44,13 @@ impl TypeContext {
             );
         }
         // Return context
-        TypeContext { fnmap }
+        TypeContext { fnmap, vmap: HashMap::new() }
     }
     pub fn get_fn(&self, s: &String) -> Option<&(Vec<Type>, Type)> {
         self.fnmap.get(s)
+    }
+    pub fn get_var(&self, s: &String) -> Option<&Type> {
+        self.vmap.get(s)
     }
 }
 
@@ -121,7 +125,14 @@ pub fn synth_type(c: &TypeContext, e: &Expression) -> Result<Type, String> {
             let e1_type = synth_type(c, e1.as_ref());
             // Return
             e1_type
-        }
+        },
+        ExpressionBody::VariableExpression(s) => {
+            // Get type of s from the context
+            match c.get_var(s) {
+                Some(t) => Ok(t.clone()),
+                _ => Err(type_error("Invalid variable: ".to_string() + s, &e.1))
+            }
+        },
         _ => panic!()
     }
 }
