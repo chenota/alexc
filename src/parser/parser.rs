@@ -6,10 +6,17 @@ pub enum Type {
     Int,
     Float
 }
+impl Type {
+    pub fn byte_size(&self) -> usize {
+        match self {
+            Type::Int | Type::Float => 8
+        }
+    }
+}
 
 pub type Program = (HashMap<Ident, Function>, SymbolTable);
 pub type Function = (ForceTypedIdentList, Type, Block, Location);
-pub type SymbolTable = Vec<(usize, HashMap<String, (Type, )>)>;
+pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, )>)>; // Type, byte offset in stack, 
 pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
@@ -264,7 +271,7 @@ impl Parser {
             self.expect_err(TokenType::Semi)?;
             // Create a new symbol table entry for parent scope
             // TODO in future: type inference to figure out type rather than crashing if no type provided
-            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(),)) {
+            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(), 0)) {
                 Some(_) => return Err(self.generic_err("Duplicate variables in scope")),
                 _ => ()
             };
