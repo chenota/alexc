@@ -10,7 +10,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -28,7 +28,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -46,7 +46,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -64,7 +64,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -85,7 +85,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -106,7 +106,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -124,7 +124,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -142,7 +142,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -166,7 +166,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -190,7 +190,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -208,7 +208,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -222,16 +222,16 @@ mod parser_tests {
     #[test]
     fn let_stmt() {
         // Stream
-        let s = "fun main() -> int { let x = 0; return x; }".to_string();
+        let s = "fun main() -> int { let x: int = 0; return x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
         match &mainfn.2.0[0] {
-            (StatementBody::LetStmt((s, None), (ExpressionBody::IntLiteral(_, x), _)), _) => {
+            (StatementBody::LetStmt((s, _), (ExpressionBody::IntLiteral(_, x), _)), _) => {
                 assert_eq!(*x, 0);
                 assert_eq!(s, "x")
             },
@@ -243,11 +243,11 @@ mod parser_tests {
     #[test]
     fn assign_stmt() {
         // Stream
-        let s = "fun main() -> int { let x = 0; x = 1; return x; }".to_string();
+        let s = "fun main() -> int { let x: int = 0; x = 1; return x; }".to_string();
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -268,7 +268,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -286,7 +286,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -307,7 +307,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        let x = p.parse().unwrap();
+        let x = p.parse().unwrap().0;
         // Get main function from program
         let mainfn = x.get(&"main".to_string()).unwrap();
         // Check values
@@ -328,7 +328,7 @@ mod parser_tests {
         // Token generator
         let mut p = Parser::new(s);
         // Parse
-        p.parse().unwrap();
+        p.parse().unwrap().0;
         // Return
         ()
     }

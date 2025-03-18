@@ -7,9 +7,10 @@ pub enum Type {
     Float
 }
 
-pub type Program = HashMap<Ident, Function>;
+pub type Program = (HashMap<Ident, Function>, SymbolTable);
 pub type Function = (ForceTypedIdentList, Type, Block, Location);
-pub type Block = (Vec<Statement>, );
+pub type SymbolTable = Vec<(usize, HashMap<String, (Type, )>)>;
+pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
     ExprStatement(Expression),
@@ -147,10 +148,12 @@ impl Parser {
     fn program(&mut self) -> Result<Program, String> {
         // Vectors to hold parts of the program
         let mut fns = HashMap::new();
-        // Capture statements and functions until can't anymore
+        // Create symbol table with one entry (global scope)
+        let mut table: SymbolTable = vec![ (0, HashMap::new()) ];
+        // Capture functions until can't anymore
         loop {
             // Check if function
-            match self.function()? {
+            match self.function(&mut table)? {
                 Some(f) => {
                     fns.insert(f.0, f.1);
                     continue
@@ -161,22 +164,26 @@ impl Parser {
             break
         }
         // Return program
-        Ok(fns)
+        Ok((fns, table))
     }
-    fn block(&mut self) -> Result<Option<Block>, String> {
+    fn block(&mut self, table: &mut SymbolTable, parent: usize) -> Result<Option<Block>, String> {
         // Check for open bracket
         match self.expect(TokenType::LBracket)? {
             None => return Ok(None),
             _ => ()
         };
+        // Create new node in the symbol table (point back to parent)
+        table.push((parent, HashMap::new()));
+        // Get new scope id
+        let scope_id = table.len() - 1;
         // Parse statement list
-        let stmts = self.stmtlist()?;
+        let stmts = self.stmtlist(table, scope_id)?;
         // Check for close bracket
         self.expect_err(TokenType::RBracket)?;
-        // Return
-        Ok(Some((stmts, )))
+        // Return and attach current block's scope id
+        Ok(Some((stmts, scope_id)))
     }
-    fn function(&mut self) -> Result<Option<(String, Function)>, String> {
+    fn function(&mut self, table: &mut SymbolTable) -> Result<Option<(String, Function)>, String> {
         // Check for function keyword
         let loc = match self.expect(TokenType::FunKw)? {
             Some((_, _, loc)) => loc.clone(),
@@ -204,12 +211,12 @@ impl Parser {
         self.expect_err(TokenType::Arrow)?;
         // Expect ident
         let ret_type = self.parse_type()?;
-        // Expect block
-        let b = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+        // Expect block (parent is always global scope for function block)
+        let b = match self.block(table, 0)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
         // Return
         Ok(Some((id, (idlist, ret_type, b, loc))))
     }
-    fn statement(&mut self) -> Result<Option<Statement>, String> {
+    fn statement(&mut self, table: &mut SymbolTable, parent: usize) -> Result<Option<Statement>, String> {
         // Mark position
         let pos = self.mark();
         // Skip to next token for lookahead and save location of statement
@@ -255,6 +262,12 @@ impl Parser {
             };
             // Expect a semicolon
             self.expect_err(TokenType::Semi)?;
+            // Create a new symbol table entry for parent scope
+            // TODO in future: type inference to figure out type rather than crashing if no type provided
+            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(),)) {
+                Some(_) => return Err(self.generic_err("Duplicate variables in scope")),
+                _ => ()
+            };
             // Put together and return
             return Ok(Some((StatementBody::LetStmt(tid, e), loc)))
         };
@@ -279,11 +292,11 @@ impl Parser {
                 None => return Err(self.expected_err("Expression"))
             };
             // Expect block
-            let ifbody = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+            let ifbody = match self.block(table, parent)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
             // Check if else keyword
             let elsebody = if self.expect(TokenType::ElseKw)?.is_some() {
                 // Parse else body
-                let b = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+                let b = match self.block(table, parent)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
                 Some(b)
             } else {
                 // Return empty body
@@ -300,12 +313,12 @@ impl Parser {
                 None => return Err(self.expected_err("Expression"))
             };
             // Expect block
-            let whilebody = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+            let whilebody = match self.block(table, parent)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
             // Put together while statement
             return Ok(Some((StatementBody::WhileStmt(cond, whilebody), loc)))
         }
         // Attempt to parse block
-        match self.block()? {
+        match self.block(table, parent)? {
             Some(b) => return Ok(Some((StatementBody::BlockStmt(b), loc))),
             None => {
                 // Reset position
@@ -447,13 +460,13 @@ impl Parser {
         // No value matched
         Ok(None)
     }
-    fn stmtlist(&mut self) -> Result<StmtList, String> {
+    fn stmtlist(&mut self, table: &mut SymbolTable, parent: usize) -> Result<StmtList, String> {
         // Statements
         let mut stmts = Vec::new();
         // Loop
         loop {
             // Attempt to parse a statement
-            match self.statement()? {
+            match self.statement(table, parent)? {
                 Some(st) => stmts.push(st),
                 _ => break
             }
