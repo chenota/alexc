@@ -8,15 +8,17 @@ pub enum Type {
 }
 
 pub type Program = HashMap<Ident, Function>;
-pub type Function = (ForceTypedIdentList, Type, StmtList, Location);
+pub type Function = (ForceTypedIdentList, Type, Block, Location);
+pub type Block = (Vec<Statement>, );
 
 pub enum StatementBody {
     ExprStatement(Expression),
     ReturnStatement(Expression),
     LetStmt(TypedIdent, Expression),
     AssignStmt(Ident, Expression),
-    IfStmt(Expression, StmtList, StmtList),
-    WhileStmt(Expression, StmtList)
+    IfStmt(Expression, Block, Option<Block>),
+    WhileStmt(Expression, Block),
+    BlockStmt(Block)
 }
 
 pub type Statement = (StatementBody, Location);
@@ -161,6 +163,19 @@ impl Parser {
         // Return program
         Ok(fns)
     }
+    fn block(&mut self) -> Result<Option<Block>, String> {
+        // Check for open bracket
+        match self.expect(TokenType::LBracket)? {
+            None => return Ok(None),
+            _ => ()
+        };
+        // Parse statement list
+        let stmts = self.stmtlist()?;
+        // Check for close bracket
+        self.expect_err(TokenType::RBracket)?;
+        // Return
+        Ok(Some((stmts, )))
+    }
     fn function(&mut self) -> Result<Option<(String, Function)>, String> {
         // Check for function keyword
         let loc = match self.expect(TokenType::FunKw)? {
@@ -189,14 +204,10 @@ impl Parser {
         self.expect_err(TokenType::Arrow)?;
         // Expect ident
         let ret_type = self.parse_type()?;
-        // Expect opening bracket
-        self.expect_err(TokenType::LBracket)?;
-        // Parse a statement list
-        let stmts = self.stmtlist()?;
-        // Expect closing bracket
-        self.expect_err(TokenType::RBracket)?;
+        // Expect block
+        let b = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
         // Return
-        Ok(Some((id, (idlist, ret_type, stmts, loc))))
+        Ok(Some((id, (idlist, ret_type, b, loc))))
     }
     fn statement(&mut self) -> Result<Option<Statement>, String> {
         // Mark position
@@ -267,22 +278,16 @@ impl Parser {
                 Some(e) => e,
                 None => return Err(self.expected_err("Expression"))
             };
-            // Expect open bracket
-            self.expect_err(TokenType::LBracket)?;
-            // Parse statement list
-            let ifbody = self.stmtlist()?;
-            // Expect close bracket
-            self.expect_err(TokenType::RBracket)?;
+            // Expect block
+            let ifbody = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
             // Check if else keyword
             let elsebody = if self.expect(TokenType::ElseKw)?.is_some() {
                 // Parse else body
-                self.expect_err(TokenType::LBracket)?;
-                let sl = self.stmtlist()?;
-                self.expect_err(TokenType::RBracket)?;
-                sl
+                let b = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+                Some(b)
             } else {
                 // Return empty body
-                Vec::new()
+                None
             };
             // Put together if statement
             return Ok(Some((StatementBody::IfStmt(cond, ifbody, elsebody), loc)))
@@ -294,15 +299,19 @@ impl Parser {
                 Some(e) => e,
                 None => return Err(self.expected_err("Expression"))
             };
-            // Expect open bracket
-            self.expect_err(TokenType::LBracket)?;
-            // Parse statement list
-            let whilebody = self.stmtlist()?;
-            // Expect close bracket
-            self.expect_err(TokenType::RBracket)?;
+            // Expect block
+            let whilebody = match self.block()? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
             // Put together while statement
             return Ok(Some((StatementBody::WhileStmt(cond, whilebody), loc)))
         }
+        // Attempt to parse block
+        match self.block()? {
+            Some(b) => return Ok(Some((StatementBody::BlockStmt(b), loc))),
+            None => {
+                // Reset position
+                self.reset(pos);
+            }
+        };
         // Attempt to parse expression
         match self.expression()? {
             Some(e) => {
