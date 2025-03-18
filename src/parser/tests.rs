@@ -350,4 +350,30 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn sym_table_1() {
+        // Stream
+        let s = "fun main -> int { { let x: int = 0; } return 0; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let table = p.parse().unwrap().1;
+        // Assert number of table entries
+        assert_eq!(table.len(), 3);
+        // Return
+        ()
+    }
+    #[test]
+    fn sym_table_2() {
+        // Stream
+        let s = "fun notmain -> int { return 0; } fun main -> int { { { let x: int = 0; } } return 0; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let table = p.parse().unwrap().1;
+        // Assert number of table entries
+        assert_eq!(table.len(), 5);
+        // Return
+        ()
+    }
 }
