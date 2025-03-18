@@ -332,4 +332,22 @@ mod parser_tests {
         // Return
         ()
     }
+    #[test]
+    fn block_stmt() {
+        // Stream
+        let s = "fun main -> int { { let x: int = 0; } return 0; }".to_string();
+        // Token generator
+        let mut p = Parser::new(s);
+        // Parse
+        let x = p.parse().unwrap().0;
+        // Get main function from program
+        let mainfn = x.get(&"main".to_string()).unwrap();
+        // Check values
+        match &mainfn.2.0[0] {
+            (StatementBody::BlockStmt(_), _) => (),
+            _ => panic!()
+        }
+        // Return
+        ()
+    }
 }
