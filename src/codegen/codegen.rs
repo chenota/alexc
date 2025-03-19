@@ -1,4 +1,6 @@
 use crate::parser::parser::*;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 
 #[derive(Clone)]
 pub enum Operand {
@@ -165,11 +167,11 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
     // Loop through functions in the program
     for fun in funs {
         // Start function block
-        let instrs = vec![
+        let header = vec![
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(instrs))?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header))?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
@@ -178,12 +180,20 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
 }
 
 pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), String> {
+    // Open file
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path) {
+        Ok(f) => f,
+        Err(e) => return Err(e.to_string())
+    };
+    // Write lines to file
     for block in ir {
         for instr in block {
-            match std::fs::write(&path, instr.to_string() + "\n") {
-                Ok(_) => (),
-                Err(e) => return Err(e.to_string())
-            };
+            if let Err(e) = writeln!(file, "{}", instr.to_string()) {
+                return Err(e.to_string());
+            }
         }
     };
     Ok(())
