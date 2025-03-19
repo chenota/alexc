@@ -18,7 +18,9 @@ pub enum ArithOp {
 pub enum Instruction {
     Label(String),
     Arithetic(ArithOp, Operand, Operand),
-    Mov(Operand, Operand)
+    Mov(Operand, Operand),
+    Syscall,
+    Return
 }
 
 pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruction>, usize), String> {
@@ -55,7 +57,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruc
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable) -> Result<Vec<Vec<Instruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<Vec<Instruction>>, String> {
     // Instructions vector
     let mut instrs = vec![ Vec::new() ];
     // Loop through each statement in block
@@ -69,6 +71,25 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable) -> Result<Vec<Vec<Instruct
                     instrs[instrs_len - 1].push(x)
                 };
             },
+            StatementBody::ReturnStatement((e, _)) => {
+                // Get length of instructions
+                let instrs_len = instrs.len();
+                // Generate code for expression, extend most recent basic block
+                for x in expression_cg(e, 0)?.0.drain(..) {
+                    instrs[instrs_len - 1].push(x)
+                };
+                // Special case for main
+                if main {
+                    // Setup syscall
+                    instrs[instrs_len - 1].push(Instruction::Mov(Operand::Register(0), Operand::Immediate(1)));
+                    instrs[instrs_len - 1].push(Instruction::Mov(Operand::Register(5), Operand::Temporary(0)));
+                    // Do syscall
+                    instrs[instrs_len - 1].push(Instruction::Syscall);
+                } else {
+                    // Push return instruction
+                    instrs[instrs_len - 1].push(Instruction::Return);
+                }
+            }
             _ => panic!()
         }
     };
