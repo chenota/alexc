@@ -7,12 +7,32 @@ pub enum Operand {
     Variable(String),
     Return
 }
+impl ToString for Operand {
+    fn to_string(&self) -> String {
+        match self {
+            Operand::Temporary(x) => "T".to_string() + &x.to_string(),
+            Operand::Immediate(x) => "#".to_string() + &x.to_string(),
+            Operand::Variable(s) => s.clone(),
+            Operand::Return => "ret".to_string()
+        }
+    }
+}
 #[derive(Clone)]
 pub enum ArithOp {
     Add,
     Sub,
     Div,
     Mul
+}
+impl ToString for ArithOp {
+    fn to_string(&self) -> String {
+        match self {
+            ArithOp::Sub => "sub".to_string(),
+            ArithOp::Add => "add".to_string(),
+            ArithOp::Mul => "mul".to_string(),
+            ArithOp::Div => "div".to_string()
+        }
+    }
 }
 #[derive(Clone)]
 pub enum IRInstruction {
@@ -21,6 +41,17 @@ pub enum IRInstruction {
     Mov(Operand, Operand),
     Return,
     Exit(Operand)
+}
+impl ToString for IRInstruction {
+    fn to_string(&self) -> String {
+        match self {
+            IRInstruction::Arithmetic(op, op1, op2) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string(),
+            IRInstruction::Exit(op1) => "exit ".to_string() + &op1.to_string(),
+            IRInstruction::Label(s) => s.clone() + ":",
+            IRInstruction::Mov(op1, op2) => "mov ".to_string() + &op1.to_string() + " " + &op2.to_string(),
+            IRInstruction::Return => "return".to_string()
+        }
+    }
 }
 
 pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
