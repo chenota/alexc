@@ -359,7 +359,7 @@ mod parser_tests {
         // Parse
         let table = p.parse().unwrap().1;
         // Assert number of table entries
-        assert_eq!(table.len(), 3);
+        assert_eq!(table.len(), 4);
         // Return
         ()
     }
@@ -372,7 +372,7 @@ mod parser_tests {
         // Parse
         let table = p.parse().unwrap().1;
         // Assert number of table entries
-        assert_eq!(table.len(), 5);
+        assert_eq!(table.len(), 7);
         // Return
         ()
     }
