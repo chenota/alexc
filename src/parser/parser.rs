@@ -218,8 +218,17 @@ impl Parser {
         self.expect_err(TokenType::Arrow)?;
         // Expect ident
         let ret_type = self.parse_type()?;
-        // Expect block (parent is always global scope for function block)
-        let b = match self.block(table, 0)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
+        // Create symbol table entry just for function parameters (this allows for redefining in body)
+        let mut vars = HashMap::new();
+        for (id, typ) in &idlist {
+            match vars.insert(id.clone(), (typ.clone(), 0, true)) {
+                None => (),
+                Some(_) => return Err(self.generic_err("Duplicate function parameters"))
+            }
+        };
+        table.push((0, vars));
+        // Expect block (parent is function parameter scope)
+        let b = match self.block(table, table.len() - 1)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
         // Return
         Ok(Some((id, (idlist, ret_type, b, loc))))
     }
