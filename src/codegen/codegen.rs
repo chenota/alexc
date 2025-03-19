@@ -31,8 +31,8 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruc
             // Check operation
             let instr = match op {
                 Bop::PlusBop => Instruction::Arithetic(ArithOp::Add, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
-                Bop::MinusBop => Instruction::Arithetic(ArithOp::Sub, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),,
-                Bop::TimesBop => Instruction::Arithetic(ArithOp::Mul, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),,
+                Bop::MinusBop => Instruction::Arithetic(ArithOp::Sub, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
+                Bop::TimesBop => Instruction::Arithetic(ArithOp::Mul, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
                 Bop::DivBop => Instruction::Arithetic(ArithOp::Div, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
             };
             // Put everything together and return
@@ -59,11 +59,16 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable) -> Result<Vec<Vec<Instruct
     for stmt in &bl.0 { 
         match &stmt.0 {
             StatementBody::ExprStatement((e, _)) => {
+                // Get length of instructions
+                let instrs_len = instrs.len();
                 // Generate code for expression, extend most recent basic block
-                for x in expression_cg(e, 0)?.drain(..) {
-                    instrs[instrs.len() - 1].push(x)
+                for x in expression_cg(e, 0)?.0.drain(..) {
+                    instrs[instrs_len - 1].push(x)
                 };
             },
+            _ => panic!()
         }
     };
+    // Return
+    Ok(instrs)
 }
