@@ -1,17 +1,17 @@
 # AlexC
 
-⚠️Under Construction!⚠️
+⚠️Under Construction⚠️
 
-AlexC is a compiled language that targets x86 assembly. 
+AlexC is a compiled language that targets x86-64 assembly. A lot of people are saying that AlexC will be the greatest programming language ever made when it is complete.
 
 ## Progress
 
 | Category                    | Progress |
 |-----------------------------|----------|
 | Token Generation            | ✅       |
-| Parsing                     | ✅       |
-| Type Checking and Inference | 🚧       |
-| Code Generation             | ❌       |
+| Parsing                     | 🚧       |
+| First-Pass Code Generation  | 🚧       |
+| Register Allocation         | ❌       |
 
 ## Books
 
