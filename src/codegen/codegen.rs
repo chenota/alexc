@@ -1,17 +1,20 @@
 use crate::parser::parser::*;
 
+#[derive(Clone)]
 pub enum Operand {
     Temporary(usize),
     Variable(String),
     Register(usize),
     Immediate(i32)
 }
+#[derive(Clone)]
 pub enum ArithOp {
     Add,
     Sub,
     Div,
     Mul
 }
+#[derive(Clone)]
 pub enum Instruction {
     Label(String),
     Arithetic(ArithOp, Operand, Operand),
