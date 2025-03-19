@@ -5,9 +5,7 @@ pub enum Operand {
     Temporary(usize),
     Register(usize),
     Immediate(i32),
-    Memory(Box<Operand>, Box<Operand>),
-    StackPointer,
-    Offset(String)
+    Variable(String)
 }
 #[derive(Clone)]
 pub enum ArithOp {
@@ -39,7 +37,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     }
 }
 
-pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruction>, usize), String> {
+pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
             // Get expressions out of boxes
@@ -51,30 +49,32 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruc
             let mut op2code = expression_cg(e2, reserved + op1code.1)?;
             // Check operation
             let instr = match op {
-                Bop::PlusBop => Instruction::Arithetic(ArithOp::Add, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
-                Bop::MinusBop => Instruction::Arithetic(ArithOp::Sub, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
-                Bop::TimesBop => Instruction::Arithetic(ArithOp::Mul, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
-                Bop::DivBop => Instruction::Arithetic(ArithOp::Div, Operand::Temporary(reserved + op1code.1), Operand::Temporary(reserved)),
+                Bop::PlusBop => Instruction::Arithetic(ArithOp::Add, op2code.2, op1code.2),
+                Bop::MinusBop => Instruction::Arithetic(ArithOp::Sub, op2code.2, op1code.2),
+                Bop::TimesBop => Instruction::Arithetic(ArithOp::Mul, op2code.2, op1code.2),
+                Bop::DivBop => Instruction::Arithetic(ArithOp::Div, op2code.2, op1code.2),
             };
             // Put everything together and return
             let mut instrs = Vec::new();
             for x in op1code.0.drain(..) { instrs.push(x) };
             for x in op2code.0.drain(..) { instrs.push(x) };
             instrs.push(instr);
-            return Ok((instrs, 1))
+            return Ok((instrs, 1, Operand::Temporary(reserved)))
         },
         ExpressionBody::IntLiteral(sign, magnitude) => {
             // Move immediate into register
             return Ok((
-                vec![ Instruction::Mov(Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32)), Operand::Temporary(reserved)) ],
-                1
+                Vec::new(),
+                0,
+                Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))
             ))
         },
         ExpressionBody::VariableExpression(ident) => {
             // Load into next available register (mov [sp + offset(ident)] -> tx)
             return Ok((
-                vec![ Instruction::Mov(Operand::Memory(Box::new(Operand::StackPointer), Box::new(Operand::Offset(ident.clone()))), Operand::Temporary(reserved)) ], 
-                1
+                Vec::new(), 
+                0,
+                Operand::Variable(ident.clone())
             ))
         },
         _ => panic!()
