@@ -5,7 +5,8 @@ pub enum Operand {
     Temporary(usize),
     Register(usize),
     Immediate(i32),
-    Variable(String)
+    Variable(String),
+    Return
 }
 #[derive(Clone)]
 pub enum ArithOp {
@@ -15,12 +16,12 @@ pub enum ArithOp {
     Mul
 }
 #[derive(Clone)]
-pub enum Instruction {
+pub enum IRInstruction {
     Label(String),
     Arithetic(ArithOp, Operand, Operand),
     Mov(Operand, Operand),
-    Syscall,
-    Return
+    Return,
+    Exit(Operand)
 }
 
 pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
@@ -37,7 +38,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     }
 }
 
-pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruction>, usize, Operand), String> {
+pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
             // Get expressions out of boxes
@@ -49,10 +50,10 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruc
             let mut op2code = expression_cg(e2, reserved + op1code.1)?;
             // Check operation
             let instr = match op {
-                Bop::PlusBop => Instruction::Arithetic(ArithOp::Add, op2code.2, op1code.2),
-                Bop::MinusBop => Instruction::Arithetic(ArithOp::Sub, op2code.2, op1code.2),
-                Bop::TimesBop => Instruction::Arithetic(ArithOp::Mul, op2code.2, op1code.2),
-                Bop::DivBop => Instruction::Arithetic(ArithOp::Div, op2code.2, op1code.2),
+                Bop::PlusBop => IRInstruction::Arithetic(ArithOp::Add, op2code.2, op1code.2),
+                Bop::MinusBop => IRInstruction::Arithetic(ArithOp::Sub, op2code.2, op1code.2),
+                Bop::TimesBop => IRInstruction::Arithetic(ArithOp::Mul, op2code.2, op1code.2),
+                Bop::DivBop => IRInstruction::Arithetic(ArithOp::Div, op2code.2, op1code.2),
             };
             // Put everything together and return
             let mut instrs = Vec::new();
@@ -81,7 +82,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<Instruc
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<Vec<Instruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<Vec<IRInstruction>>, String> {
     // Instructions vector
     let mut instrs = vec![ Vec::new() ];
     // Loop through each statement in block
@@ -98,20 +99,20 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<
             StatementBody::ReturnStatement((e, _)) => {
                 // Get length of instructions
                 let instrs_len = instrs.len();
-                // Generate code for expression, extend most recent basic block
-                for x in expression_cg(e, 0)?.0.drain(..) {
+                // Generate code for expression
+                let (mut code, _, operand) = expression_cg(e, 0)?;
+                for x in code.drain(..) {
                     instrs[instrs_len - 1].push(x)
                 };
                 // Special case for main
                 if main {
-                    // Setup syscall
-                    instrs[instrs_len - 1].push(Instruction::Mov(Operand::Register(0), Operand::Immediate(1)));
-                    instrs[instrs_len - 1].push(Instruction::Mov(Operand::Register(5), Operand::Temporary(0)));
-                    // Do syscall
-                    instrs[instrs_len - 1].push(Instruction::Syscall);
+                    // Do exit
+                    instrs[instrs_len - 1].push(IRInstruction::Exit(operand));
                 } else {
+                    // Move result into return register
+                    instrs[instrs_len - 1].push(IRInstruction::Mov(operand, Operand::Return));
                     // Push return instruction
-                    instrs[instrs_len - 1].push(Instruction::Return);
+                    instrs[instrs_len - 1].push(IRInstruction::Return);
                 }
             }
             _ => panic!()

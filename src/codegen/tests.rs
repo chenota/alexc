@@ -4,7 +4,7 @@ mod tgen_tests {
     use crate::parser::parser::*;
 
     #[test]
-    fn expr1() {
+    fn ir_expr1() {
         // Stream
         let s = "fun main -> int { return 0; }".to_string();
         // Token generator
@@ -20,7 +20,7 @@ mod tgen_tests {
         // Test codegen result
         assert_eq!(first.len() - 3, 1);
         match &first[0] {
-            Instruction::Mov(op1, op2) => {
+            IRInstruction::Mov(op1, op2) => {
                 match op1 {
                     Operand::Immediate(0) => (),
                     _ => panic!()
@@ -37,7 +37,7 @@ mod tgen_tests {
     }
 
     #[test]
-    fn expr2() {
+    fn ir_expr2() {
         // Stream
         let s = "fun main -> int { return 1 + 1; }".to_string();
         // Token generator
@@ -53,15 +53,15 @@ mod tgen_tests {
         // Test codegen result
         assert_eq!(first.len() - 3, 3);
         match &first[0] {
-            Instruction::Mov(_, _) => (),
+            IRInstruction::Mov(_, _) => (),
             _ => panic!()
         };
         match &first[1] {
-            Instruction::Mov(_, _) => (),
+            IRInstruction::Mov(_, _) => (),
             _ => panic!()
         };
         match &first[2] {
-            Instruction::Arithetic(ArithOp::Add, _, _) => (),
+            IRInstruction::Arithetic(ArithOp::Add, _, _) => (),
             _ => panic!()
         };
         // Return
@@ -69,7 +69,7 @@ mod tgen_tests {
     }
 
     #[test]
-    fn expr3() {
+    fn ir_expr3() {
         // Stream
         let s = "fun main -> int { return (1 + 1) * (2 + 2); }".to_string();
         // Token generator
@@ -85,15 +85,15 @@ mod tgen_tests {
         // Test codegen result
         assert_eq!(first.len() - 3, 7);
         let x = match &first[2] {
-            Instruction::Arithetic(ArithOp::Add, _, Operand::Temporary(x)) => x,
+            IRInstruction::Arithetic(ArithOp::Add, _, Operand::Temporary(x)) => x,
             _ => panic!()
         };
         let y = match &first[5] {
-            Instruction::Arithetic(ArithOp::Add, _, Operand::Temporary(y)) => y,
+            IRInstruction::Arithetic(ArithOp::Add, _, Operand::Temporary(y)) => y,
             _ => panic!()
         };
         let z = match &first[6] {
-            Instruction::Arithetic(ArithOp::Mul, _, Operand::Temporary(z)) => z,
+            IRInstruction::Arithetic(ArithOp::Mul, _, Operand::Temporary(z)) => z,
             _ => panic!()
         };
         assert_eq!(*x + 1, *y);
