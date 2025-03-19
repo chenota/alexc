@@ -97,16 +97,16 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
         ExpressionBody::IntLiteral(sign, magnitude) => {
             // Move immediate into register
             return Ok((
-                Vec::new(),
-                0,
-                Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))
+                vec![IRInstruction::Mov(Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32)), Operand::Temporary(reserved))],
+                1,
+                Operand::Temporary(reserved)
             ))
         },
         ExpressionBody::VariableExpression(ident) => {
             // Load into next available register (mov [sp + offset(ident)] -> tx)
             return Ok((
                 Vec::new(), 
-                0,
+                1,
                 Operand::Variable(ident.clone())
             ))
         },
