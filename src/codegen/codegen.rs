@@ -3,7 +3,6 @@ use crate::parser::parser::*;
 #[derive(Clone)]
 pub enum Operand {
     Temporary(usize),
-    Register(usize),
     Immediate(i32),
     Variable(String),
     Return
@@ -18,7 +17,7 @@ pub enum ArithOp {
 #[derive(Clone)]
 pub enum IRInstruction {
     Label(String),
-    Arithetic(ArithOp, Operand, Operand),
+    Arithmetic(ArithOp, Operand, Operand),
     Mov(Operand, Operand),
     Return,
     Exit(Operand)
@@ -50,10 +49,10 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
             let mut op2code = expression_cg(e2, reserved + op1code.1)?;
             // Check operation
             let instr = match op {
-                Bop::PlusBop => IRInstruction::Arithetic(ArithOp::Add, op2code.2, op1code.2),
-                Bop::MinusBop => IRInstruction::Arithetic(ArithOp::Sub, op2code.2, op1code.2),
-                Bop::TimesBop => IRInstruction::Arithetic(ArithOp::Mul, op2code.2, op1code.2),
-                Bop::DivBop => IRInstruction::Arithetic(ArithOp::Div, op2code.2, op1code.2),
+                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2code.2, op1code.2),
+                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2code.2, op1code.2),
+                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2code.2, op1code.2),
+                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2code.2, op1code.2),
             };
             // Put everything together and return
             let mut instrs = Vec::new();

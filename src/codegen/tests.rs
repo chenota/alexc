@@ -49,7 +49,7 @@ mod tgen_tests {
         // Test codegen result
         assert_eq!(first.len(), 2);
         match &first[0] {
-            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
+            IRInstruction::Arithmetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
         match &first[1] {
@@ -82,15 +82,15 @@ mod tgen_tests {
         // Test codegen result
         assert_eq!(first.len(), 4);
         match &first[0] {
-            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
+            IRInstruction::Arithmetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
         match &first[1] {
-            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
+            IRInstruction::Arithmetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
         match &first[2] {
-            IRInstruction::Arithetic(ArithOp::Mul, Operand::Temporary(_), Operand::Temporary(_)) => (),
+            IRInstruction::Arithmetic(ArithOp::Mul, Operand::Temporary(_), Operand::Temporary(_)) => (),
             _ => panic!()
         };
         match &first[3] {
