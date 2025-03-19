@@ -18,17 +18,13 @@ mod tgen_tests {
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result
-        assert_eq!(first.len() - 3, 1);
+        assert_eq!(first.len(), 1);
         match &first[0] {
-            IRInstruction::Mov(op1, op2) => {
+            IRInstruction::Exit(op1) => {
                 match op1 {
                     Operand::Immediate(0) => (),
                     _ => panic!()
                 };
-                match op2 {
-                    Operand::Temporary(0) => (),
-                    _ => panic!()
-                }
             }
             _ => panic!()
         };
@@ -51,17 +47,18 @@ mod tgen_tests {
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result
-        assert_eq!(first.len() - 3, 3);
+        assert_eq!(first.len(), 2);
         match &first[0] {
-            IRInstruction::Mov(_, _) => (),
+            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
         match &first[1] {
-            IRInstruction::Mov(_, _) => (),
-            _ => panic!()
-        };
-        match &first[2] {
-            IRInstruction::Arithetic(ArithOp::Add, _, _) => (),
+            IRInstruction::Exit(op1) => {
+                match op1 {
+                    Operand::Temporary(_) => (),
+                    _ => panic!()
+                }
+            },
             _ => panic!()
         };
         // Return
@@ -83,21 +80,23 @@ mod tgen_tests {
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result
-        assert_eq!(first.len() - 3, 7);
-        let x = match &first[2] {
-            IRInstruction::Arithetic(ArithOp::Add, _, Operand::Temporary(x)) => x,
+        assert_eq!(first.len(), 4);
+        match &first[0] {
+            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
-        let y = match &first[5] {
-            IRInstruction::Arithetic(ArithOp::Add, _, Operand::Temporary(y)) => y,
+        match &first[1] {
+            IRInstruction::Arithetic(ArithOp::Add, Operand::Immediate(_), Operand::Immediate(_)) => (),
             _ => panic!()
         };
-        let z = match &first[6] {
-            IRInstruction::Arithetic(ArithOp::Mul, _, Operand::Temporary(z)) => z,
+        match &first[2] {
+            IRInstruction::Arithetic(ArithOp::Mul, Operand::Temporary(_), Operand::Temporary(_)) => (),
             _ => panic!()
         };
-        assert_eq!(*x + 1, *y);
-        assert_eq!(*x, *z);
+        match &first[3] {
+            IRInstruction::Exit(Operand::Temporary(_)) => (),
+            _ => panic!()
+        };
         // Return
         ()
     }
