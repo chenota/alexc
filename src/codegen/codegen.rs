@@ -151,3 +151,31 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<
     // Return
     Ok(instrs)
 }
+
+pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTable), String> {
+    // Make prog mutable
+    let (funs, mut st) = prog;
+    // Blocks vector
+    let mut blocks = Vec::new();
+    // Loop through functions in the program
+    for fun in funs {
+        // Generate blocks for that function
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main")?;
+        // Add blocks to blocks vector
+        for block in fun_blocks.drain(..) { blocks.push(block) }
+    };
+    // Return
+    Ok((blocks, st))
+}
+
+pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), String> {
+    for block in ir {
+        for instr in block {
+            match std::fs::write(&path, instr.to_string() + "\n") {
+                Ok(_) => (),
+                Err(e) => return Err(e.to_string())
+            };
+        }
+    };
+    Ok(())
+}

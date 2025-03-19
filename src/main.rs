@@ -3,6 +3,7 @@ mod parser;
 mod codegen;
 
 use clap::Parser;
+use codegen::codegen::*;
 
 #[derive(Parser, Debug)]
 #[command(version, about="Compiler for the AlexC language", long_about = None)]
@@ -21,4 +22,7 @@ struct Args {
 fn main() {
     // Parse arguments
     let args = Args::parse();
+    // Read source file as string
+    let input = std::fs::read_to_string(args.source);
+    // 
 }
