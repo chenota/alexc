@@ -14,7 +14,7 @@ mod tgen_tests {
         // Get main function
         let main = fns.get("main").unwrap();
         // Do codegen
-        let cg_result = basic_blocks(&main.2, &mut st, true).unwrap();
+        let cg_result = basic_blocks(&main.2, &mut st, true, None).unwrap();
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result
@@ -43,7 +43,7 @@ mod tgen_tests {
         // Get main function
         let main = fns.get("main").unwrap();
         // Do codegen
-        let cg_result = basic_blocks(&main.2, &mut st, true).unwrap();
+        let cg_result = basic_blocks(&main.2, &mut st, true, None).unwrap();
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result
@@ -76,7 +76,7 @@ mod tgen_tests {
         // Get main function
         let main = fns.get("main").unwrap();
         // Do codegen
-        let cg_result = basic_blocks(&main.2, &mut st, true).unwrap();
+        let cg_result = basic_blocks(&main.2, &mut st, true, None).unwrap();
         // Get first basic block of function
         let first = cg_result[0].clone();
         // Test codegen result

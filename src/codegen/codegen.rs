@@ -112,9 +112,14 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool) -> Result<Vec<Vec<IRInstruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>) -> Result<Vec<Vec<IRInstruction>>, String> {
     // Instructions vector
-    let mut instrs = vec![ Vec::new() ];
+    let mut instrs = Vec::new();
+    // Handle passthrough
+    instrs.push(match passthrough {
+        Some(v) => v,
+        _ => Vec::new()
+    });
     // Loop through each statement in block
     for stmt in &bl.0 { 
         match &stmt.0 {
@@ -159,8 +164,12 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
     let mut blocks = Vec::new();
     // Loop through functions in the program
     for fun in funs {
+        // Start function block
+        let instrs = vec![
+            IRInstruction::Label("_".to_string() + &fun.0),
+        ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main")?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(instrs))?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
