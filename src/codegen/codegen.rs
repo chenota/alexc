@@ -78,19 +78,27 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
             let e2 = &e2b.as_ref().0;
             // Generate code for first operand
             let mut op1code = expression_cg(e1, reserved)?;
-            // Generate code for second operand, keep in mind # of registers reserved by first operation
-            let mut op2code = expression_cg(e2, reserved + op1code.1)?;
+            // Peek at the next variable, skip codegen if atomic
+            let (mut op2inst, op2rt) = match &e2 {
+                ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
+                ExpressionBody::VariableExpression(s) => (Vec::new(), Operand::Variable(s.clone())),
+                _ => {
+                    // Generate code for second operand, keep in mind # of registers reserved by first operation
+                    let op2code = expression_cg(e2, reserved + op1code.1)?;
+                    (op2code.0, op2code.2)
+                }
+            };
             // Check operation
             let instr = match op {
-                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2code.2, op1code.2),
-                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2code.2, op1code.2),
-                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2code.2, op1code.2),
-                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2code.2, op1code.2),
+                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2rt, op1code.2),
+                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt, op1code.2),
+                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt, op1code.2),
+                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt, op1code.2),
             };
             // Put everything together and return
             let mut instrs = Vec::new();
             for x in op1code.0.drain(..) { instrs.push(x) };
-            for x in op2code.0.drain(..) { instrs.push(x) };
+            for x in op2inst.drain(..) { instrs.push(x) };
             instrs.push(instr);
             return Ok((instrs, 1, Operand::Temporary(reserved)))
         },
@@ -105,9 +113,9 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
         ExpressionBody::VariableExpression(ident) => {
             // Load into next available register (mov [sp + offset(ident)] -> tx)
             return Ok((
-                Vec::new(), 
+                vec![IRInstruction::Mov(Operand::Variable(ident.clone()), Operand::Temporary(reserved))], 
                 1,
-                Operand::Variable(ident.clone())
+                Operand::Temporary(reserved)
             ))
         },
         _ => panic!()
