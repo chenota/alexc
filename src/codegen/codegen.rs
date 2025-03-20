@@ -48,7 +48,8 @@ pub enum IRInstruction {
     Arithmetic(ArithOp, Operand, Operand),
     Mov(Operand, Operand),
     Return,
-    Exit(Operand)
+    Exit(Operand),
+    Jump(String),
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
@@ -57,7 +58,8 @@ impl ToString for IRInstruction {
             IRInstruction::Exit(op1) => "exit ".to_string() + &op1.to_string(),
             IRInstruction::Label(s) => s.clone() + ":",
             IRInstruction::Mov(op1, op2) => "mov ".to_string() + &op1.to_string() + " " + &op2.to_string(),
-            IRInstruction::Return => "return".to_string()
+            IRInstruction::Return => "return".to_string(),
+            IRInstruction::Jump(s) => "jmp _".to_string() + s
         }
     }
 }
@@ -124,22 +126,33 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scop
                 Operand::Temporary(reserved)
             ))
         },
-        ExpressionBody::CallExpression(fname, plist) => {
+        ExpressionBody::CallExpression(fname, alist) => {
             // Lookup function
             let finfo = match ft.get(fname) {
                 Some(x) => x,
                 None => return Err("Invalid function call".to_string())
             };
             // Check params = args
-            if plist.len() != finfo.0.len() { return Err("Invalid function call".to_string()); };
+            if alist.len() != finfo.0.len() { return Err("Invalid function call".to_string()); };
+            // Empty list for instructions
+            let mut instrs = Vec::new();
             // Generate code for parameters, load into parameter slots
-            for (i, (e, _)) in plist.iter().enumerate() {
+            for (i, (e, _)) in alist.iter().enumerate() {
                 // Generate code
-                let code = expression_cg(e, reserved, st, scope, ft)?;
-                // Move into parameter slot
-                
+                let (mut code, _, operand) = expression_cg(e, reserved, st, scope, ft)?;
+                // Move code to instrs list
+                for instr in code.drain(..) { instrs.push(instr) };
+                // Move result into parameter slot
+                instrs.push(IRInstruction::Mov(operand, Operand::Parameter(finfo.0[i].0.clone())))
             };
-            ()
+            // Jump to label for function
+            instrs.push(IRInstruction::Jump(fname.clone()));
+            // Return list
+            return Ok((
+                instrs, 
+                0,
+                Operand::Return
+            ));
         },
         _ => panic!()
     }
@@ -205,7 +218,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), ft)?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), &ft)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
