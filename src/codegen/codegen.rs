@@ -25,6 +25,18 @@ impl ToString for Operand {
         }
     }
 }
+impl PartialEq for Operand {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Operand::Immediate(x), Operand::Immediate(y)) => x == y,
+            (Operand::Parameter(x), Operand::Parameter(y)) => x == y,
+            (Operand::Return, Operand::Return) => true,
+            (Operand::Temporary(x), Operand::Temporary(y)) => x == y,
+            (Operand::Variable(x), Operand::Variable(y)) => x == y,
+            _ => false
+        }
+    }
+}
 #[derive(Clone)]
 pub enum ArithOp {
     Add,
@@ -87,29 +99,44 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scop
             // Generate code for first operand
             let mut op1code = expression_cg(e1, reserved, st, scope, ft)?;
             // Peek at the next variable, skip codegen if atomic
-            let (mut op2inst, op2rt) = match &e2 {
-                ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
-                ExpressionBody::VariableExpression(s) => (Vec::new(), Operand::Variable(s.clone())),
+            let (mut op2inst, op2res, op2rt) = match &e2 {
+                ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), 0, Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
+                ExpressionBody::VariableExpression(s) => (Vec::new(), 0, Operand::Variable(s.clone())),
                 _ => {
                     // Generate code for second operand, keep in mind # of registers reserved by first operation
                     let op2code = expression_cg(e2, reserved + op1code.1, st, scope, ft)?;
-                    (op2code.0, op2code.2)
+                    (op2code.0, op2code.1, op2code.2)
                 }
             };
-            // Operation 1 return
-            let op1rt = op1code.2.clone();
-            // Check operation
-            let instr = match op {
-                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2rt, op1rt),
-                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt, op1rt),
-                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt, op1rt),
-                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt, op1rt),
-            };
-            // Put everything together and return
+            // Operation 1 return (mutable since might have to change)
+            let mut op1rt = op1code.2.clone();
+            // Hold instruction order
             let mut instrs = Vec::new();
+            // Push operation 1's instructions to list
             for x in op1code.0.drain(..) { instrs.push(x) };
+            // If both op1 and op2 return to same address, move op1 to temporary
+            let moved = op1rt == op2rt;
+            if moved {
+                // Register to move op1 into register just past op2
+                let op1reg = Operand::Temporary(reserved + op2res);
+                // Generate move instruction
+                instrs.push(IRInstruction::Mov(op1rt, op1reg.clone()));
+                // Switch return address of op1
+                op1rt = op1reg;
+            };
+            // Add op2 instructions to list
             for x in op2inst.drain(..) { instrs.push(x) };
-            instrs.push(instr);
+            // Push binary operation instruction
+            instrs.push(match op {
+                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2rt.clone(), op1rt.clone()),
+                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt.clone(), op1rt.clone()),
+                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt.clone(), op1rt.clone()),
+                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt.clone(), op1rt.clone()),
+            });
+            // If needed to shift registers, shift result to op2's return register
+            if moved {
+                instrs.push(IRInstruction::Mov(op1rt, op2rt))
+            };
             return Ok((instrs, 1, op1code.2))
         },
         ExpressionBody::IntLiteral(sign, magnitude) => {
