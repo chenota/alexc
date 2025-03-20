@@ -49,7 +49,7 @@ pub enum IRInstruction {
     Mov(Operand, Operand),
     Return,
     Exit(Operand),
-    Jump(String),
+    Call(String),
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
@@ -59,7 +59,7 @@ impl ToString for IRInstruction {
             IRInstruction::Label(s) => s.clone() + ":",
             IRInstruction::Mov(op1, op2) => "mov ".to_string() + &op1.to_string() + " " + &op2.to_string(),
             IRInstruction::Return => "return".to_string(),
-            IRInstruction::Jump(s) => "jmp _".to_string() + s
+            IRInstruction::Call(s) => "call _".to_string() + s
         }
     }
 }
@@ -146,7 +146,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scop
                 instrs.push(IRInstruction::Mov(operand, Operand::Parameter(finfo.0[i].0.clone())))
             };
             // Jump to label for function
-            instrs.push(IRInstruction::Jump(fname.clone()));
+            instrs.push(IRInstruction::Call(fname.clone()));
             // Return list
             return Ok((
                 instrs, 
