@@ -1,20 +1,26 @@
 use crate::parser::parser::*;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::collections::HashMap;
+
+
+pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type)>;
 
 #[derive(Clone)]
 pub enum Operand {
     Temporary(usize),
     Immediate(i32),
     Variable(String),
+    Parameter(String),
     Return
 }
 impl ToString for Operand {
     fn to_string(&self) -> String {
         match self {
-            Operand::Temporary(x) => "T".to_string() + &x.to_string(),
+            Operand::Temporary(x) => "t".to_string() + &x.to_string(),
             Operand::Immediate(x) => "#".to_string() + &x.to_string(),
             Operand::Variable(s) => s.clone(),
+            Operand::Parameter(s) => "p(".to_string() + s + ")",
             Operand::Return => "ret".to_string()
         }
     }
@@ -70,21 +76,21 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     }
 }
 
-pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
+pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scope: usize, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
             // Get expressions out of boxes
             let e1 = &e1b.as_ref().0;
             let e2 = &e2b.as_ref().0;
             // Generate code for first operand
-            let mut op1code = expression_cg(e1, reserved)?;
+            let mut op1code = expression_cg(e1, reserved, st, scope, ft)?;
             // Peek at the next variable, skip codegen if atomic
             let (mut op2inst, op2rt) = match &e2 {
                 ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
                 ExpressionBody::VariableExpression(s) => (Vec::new(), Operand::Variable(s.clone())),
                 _ => {
                     // Generate code for second operand, keep in mind # of registers reserved by first operation
-                    let op2code = expression_cg(e2, reserved + op1code.1)?;
+                    let op2code = expression_cg(e2, reserved + op1code.1, st, scope, ft)?;
                     (op2code.0, op2code.2)
                 }
             };
@@ -118,11 +124,28 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize) -> Result<(Vec<IRInstr
                 Operand::Temporary(reserved)
             ))
         },
+        ExpressionBody::CallExpression(fname, plist) => {
+            // Lookup function
+            let finfo = match ft.get(fname) {
+                Some(x) => x,
+                None => return Err("Invalid function call".to_string())
+            };
+            // Check params = args
+            if plist.len() != finfo.0.len() { return Err("Invalid function call".to_string()); };
+            // Generate code for parameters, load into parameter slots
+            for (i, (e, _)) in plist.iter().enumerate() {
+                // Generate code
+                let code = expression_cg(e, reserved, st, scope, ft)?;
+                // Move into parameter slot
+                
+            };
+            ()
+        },
         _ => panic!()
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>) -> Result<Vec<Vec<IRInstruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable) -> Result<Vec<Vec<IRInstruction>>, String> {
     // Instructions vector
     let mut instrs = Vec::new();
     // Handle passthrough
@@ -137,7 +160,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Get length of instructions
                 let instrs_len = instrs.len();
                 // Generate code for expression, extend most recent basic block
-                for x in expression_cg(e, 0)?.0.drain(..) {
+                for x in expression_cg(e, 0, st, bl.1, ft)?.0.drain(..) {
                     instrs[instrs_len - 1].push(x)
                 };
             },
@@ -145,7 +168,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Get length of instructions
                 let instrs_len = instrs.len();
                 // Generate code for expression
-                let (mut code, _, operand) = expression_cg(e, 0)?;
+                let (mut code, _, operand) = expression_cg(e, 0, st, bl.1, ft)?;
                 for x in code.drain(..) {
                     instrs[instrs_len - 1].push(x)
                 };
@@ -170,6 +193,9 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
 pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTable), String> {
     // Make prog mutable
     let (funs, mut st) = prog;
+    // Construct function table from program
+    let mut ft = FunctionTable::new();
+    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), fun.1.1.clone())); };
     // Blocks vector
     let mut blocks = Vec::new();
     // Loop through functions in the program
@@ -179,7 +205,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header))?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), ft)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
