@@ -96,19 +96,21 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scop
                     (op2code.0, op2code.2)
                 }
             };
+            // Operation 1 return
+            let op1rt = op1code.2.clone();
             // Check operation
             let instr = match op {
-                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2rt, op1code.2),
-                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt, op1code.2),
-                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt, op1code.2),
-                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt, op1code.2),
+                Bop::PlusBop => IRInstruction::Arithmetic(ArithOp::Add, op2rt, op1rt),
+                Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt, op1rt),
+                Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt, op1rt),
+                Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt, op1rt),
             };
             // Put everything together and return
             let mut instrs = Vec::new();
             for x in op1code.0.drain(..) { instrs.push(x) };
             for x in op2inst.drain(..) { instrs.push(x) };
             instrs.push(instr);
-            return Ok((instrs, 1, Operand::Temporary(reserved)))
+            return Ok((instrs, 1, op1code.2))
         },
         ExpressionBody::IntLiteral(sign, magnitude) => {
             // Move immediate into register
