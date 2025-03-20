@@ -138,10 +138,25 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, st: &SymbolTable, scop
             let mut instrs = Vec::new();
             // Generate code for parameters, load into parameter slots
             for (i, (e, _)) in alist.iter().enumerate() {
-                // Generate code
-                let (mut code, _, operand) = expression_cg(e, reserved, st, scope, ft)?;
-                // Move code to instrs list
-                for instr in code.drain(..) { instrs.push(instr) };
+                // Operand to push to call register
+                let operand = match e {
+                    ExpressionBody::IntLiteral(sign, magnitude) => {
+                        // Literal operand
+                        Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))
+                    },
+                    ExpressionBody::VariableExpression(s) => {
+                        // Variable operand
+                        Operand::Variable(s.clone())
+                    },
+                    _ => {
+                        // Generate code
+                        let (mut code, _, operand) = expression_cg(e, reserved, st, scope, ft)?;
+                        // Move code to instrs list
+                        for instr in code.drain(..) { instrs.push(instr) };
+                        // Return operand
+                        operand
+                    }
+                };
                 // Move result into parameter slot
                 instrs.push(IRInstruction::Mov(operand, Operand::Parameter(finfo.0[i].0.clone())))
             };
