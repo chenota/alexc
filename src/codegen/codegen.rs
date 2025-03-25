@@ -62,16 +62,22 @@ pub enum IRInstruction {
     Return,
     Exit(Operand),
     Call(String),
+    Declare(String, Operand),
+    Fpush(usize),
+    Fpop,
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
         match self {
             IRInstruction::Arithmetic(op, op1, op2) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string(),
             IRInstruction::Exit(op1) => "exit ".to_string() + &op1.to_string(),
-            IRInstruction::Label(s) => s.clone() + ":",
+            IRInstruction::Label(s) => "label ".to_string() + &s.clone(),
             IRInstruction::Mov(op1, op2) => "mov ".to_string() + &op1.to_string() + " " + &op2.to_string(),
             IRInstruction::Return => "return".to_string(),
-            IRInstruction::Call(s) => "call _".to_string() + s
+            IRInstruction::Call(s) => "call _".to_string() + s,
+            IRInstruction::Declare(s, o) => "declare ".to_string() + s + " " + &o.to_string(),
+            IRInstruction::Fpush(x) => "fpush ".to_string() + &x.to_string(),
+            IRInstruction::Fpop => "fpop".to_string()
         }
     }
 }
@@ -210,39 +216,61 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         Some(v) => v,
         _ => Vec::new()
     });
+    // Push stack
+    instrs.last_mut().unwrap().push(IRInstruction::Fpush(bl.1));
+    // Flag to pop stack at very end of block
+    let mut fpop: bool = true;
     // Loop through each statement in block
     for stmt in &bl.0 { 
         match &stmt.0 {
             StatementBody::ExprStatement((e, _)) => {
-                // Get length of instructions
-                let instrs_len = instrs.len();
                 // Generate code for expression, extend most recent basic block
                 for x in expression_cg(e, 0, st, bl.1, ft)?.0.drain(..) {
-                    instrs[instrs_len - 1].push(x)
+                    instrs.last_mut().unwrap().push(x)
                 };
             },
             StatementBody::ReturnStatement((e, _)) => {
-                // Get length of instructions
-                let instrs_len = instrs.len();
                 // Generate code for expression
                 let (mut code, _, operand) = expression_cg(e, 0, st, bl.1, ft)?;
                 for x in code.drain(..) {
-                    instrs[instrs_len - 1].push(x)
+                    instrs.last_mut().unwrap().push(x)
                 };
                 // Special case for main
                 if main {
+                    // Pop stack
+                    instrs.last_mut().unwrap().push(IRInstruction::Fpop);
+                    fpop = false;
                     // Do exit
-                    instrs[instrs_len - 1].push(IRInstruction::Exit(operand));
+                    instrs.last_mut().unwrap().push(IRInstruction::Exit(operand));
                 } else {
                     // Move result into return register
-                    instrs[instrs_len - 1].push(IRInstruction::Mov(operand, Operand::Return));
+                    instrs.last_mut().unwrap().push(IRInstruction::Mov(operand, Operand::Return));
+                    // Pop stack
+                    instrs.last_mut().unwrap().push(IRInstruction::Fpop);
+                    fpop = false;
                     // Push return instruction
-                    instrs[instrs_len - 1].push(IRInstruction::Return);
+                    instrs.last_mut().unwrap().push(IRInstruction::Return);
                 }
-            }
+            },
+            StatementBody::LetStmt((id, ty), e) => {
+                // Check that type is an int
+                match ty {
+                    Some(Type::Int) => (),
+                    _ => return Err("Type must be an int".to_string())
+                };
+                // Generate instructions for expressions
+                let (mut code, _, operand) = expression_cg(&e.0, 0, st, bl.1, ft)?;
+                for x in code.drain(..) {
+                    instrs.last_mut().unwrap().push(x)
+                }
+                // Generate declare instruction
+                instrs.last_mut().unwrap().push(IRInstruction::Declare(id.clone(), operand))
+            },
             _ => panic!()
         }
     };
+    // End of block; pop stack
+    if fpop { instrs.last_mut().unwrap().push(IRInstruction::Fpop) };
     // Return
     Ok(instrs)
 }
