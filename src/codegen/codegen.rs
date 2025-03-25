@@ -152,6 +152,13 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             ))
         },
         ExpressionBody::VariableExpression(ident) => {
+            // Check if has target and is same as variable
+            match &target {
+                Some(Operand::Variable(x)) => if *x == *ident {
+                    return Ok((Vec::new(),0,Operand::Variable(ident.clone())))
+                },
+                _ => ()
+            };
             // Load into next available register (mov [sp + offset(ident)] -> tx)
             return Ok((
                 vec![IRInstruction::Mov(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
