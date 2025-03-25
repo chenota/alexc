@@ -257,6 +257,13 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     instrs.last_mut().unwrap().push(x)
                 }
             },
+            StatementBody::AssignStmt(id, e) => {
+                // Generate instructions for expressions
+                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), st, bl.1, ft)?;
+                for x in code.drain(..) {
+                    instrs.last_mut().unwrap().push(x)
+                }
+            },
             _ => panic!()
         }
     };
