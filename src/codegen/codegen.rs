@@ -261,16 +261,28 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), st, bl.1, ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x)
+                    instrs.last_mut().unwrap().push(x);
                 }
             },
             StatementBody::AssignStmt(id, e) => {
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), st, bl.1, ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x)
+                    instrs.last_mut().unwrap().push(x);
                 }
             },
+            StatementBody::BlockStmt(bl2) => {
+                // Generate instructions for block
+                let mut newinstrs = basic_blocks(bl2, st, main, None, ft)?;
+                // Push first generated basic block onto existing basic block (guaranteed to return at least one)
+                for x in newinstrs.drain(0..1).next().unwrap() {
+                    instrs.last_mut().unwrap().push(x)
+                };
+                // Push the rest of the basic blocks onto new vectors
+                for x in newinstrs {
+                    instrs.push(x)
+                }
+            }
             _ => panic!()
         }
     };
