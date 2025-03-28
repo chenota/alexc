@@ -98,21 +98,21 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     }
 }
 
-pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, st: &SymbolTable, scope: usize, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
+pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
             // Get expressions out of boxes
             let e1 = &e1b.as_ref().0;
             let e2 = &e2b.as_ref().0;
             // Generate code for first operand
-            let mut op1code = expression_cg(e1, reserved, target, st, scope, ft)?;
+            let mut op1code = expression_cg(e1, reserved, target, ft)?;
             // Peek at the next variable, skip codegen if atomic
             let (mut op2inst, op2res, op2rt) = match &e2 {
                 ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), 0, Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
                 ExpressionBody::VariableExpression(s) => (Vec::new(), 0, Operand::Variable(s.clone())),
                 _ => {
                     // Generate code for second operand, keep in mind # of registers reserved by first operation
-                    let op2code = expression_cg(e2, reserved + op1code.1,None, st, scope, ft)?;
+                    let op2code = expression_cg(e2, reserved + op1code.1,None, ft)?;
                     (op2code.0, op2code.1, op2code.2)
                 }
             };
@@ -194,7 +194,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     },
                     _ => {
                         // Generate code
-                        let (mut code, _, operand) = expression_cg(e, reserved, None, st, scope, ft)?;
+                        let (mut code, _, operand) = expression_cg(e, reserved, None, ft)?;
                         // Move code to instrs list
                         for instr in code.drain(..) { instrs.push(instr) };
                         // Return operand
@@ -234,13 +234,13 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         match &stmt.0 {
             StatementBody::ExprStatement((e, _)) => {
                 // Generate code for expression, extend most recent basic block
-                for x in expression_cg(e, 0, None, st, bl.1, ft)?.0.drain(..) {
+                for x in expression_cg(e, 0, None, ft)?.0.drain(..) {
                     instrs.last_mut().unwrap().push(x)
                 };
             },
             StatementBody::ReturnStatement((e, _)) => {
                 // Generate code for expression
-                let (mut code, _, operand) = expression_cg(e, 0, Some(Operand::Return), st, bl.1, ft)?;
+                let (mut code, _, operand) = expression_cg(e, 0, Some(Operand::Return), ft)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().push(x)
                 };
@@ -263,14 +263,14 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     _ => return Err("Type must be an int".to_string())
                 };
                 // Generate instructions for expressions
-                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), st, bl.1, ft)?;
+                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().push(x);
                 }
             },
             StatementBody::AssignStmt(id, e) => {
                 // Generate instructions for expressions
-                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), st, bl.1, ft)?;
+                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().push(x);
                 }
@@ -289,7 +289,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::IfStmt(e, b1, b2) => {
                 // Generate code for condition
-                let (mut code, _, operand) = expression_cg(&e.0, 0, None, st, bl.1, ft)?;
+                let (mut code, _, operand) = expression_cg(&e.0, 0, None, ft)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().push(x);
                 }
@@ -347,7 +347,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Push start label onto the block
                 instrs.last_mut().unwrap().push(IRInstruction::Label(loopstart.clone()));
                 // Generate condition checking code
-                let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, st, bl.1, ft)?;
+                let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, ft)?;
                 // Push condition code
                 for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().push(instr) }
                 // Jump out of loop if condition is zero
