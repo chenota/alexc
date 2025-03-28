@@ -158,17 +158,17 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
         ExpressionBody::VariableExpression(ident) => {
             // Check if has target and is same as variable
             match &target {
-                Some(Operand::Variable(x)) => if *x == *ident {
-                    return Ok((Vec::new(),0,Operand::Variable(ident.clone())))
+                Some(Operand::Variable(x)) => if *x != *ident {
+                    // Load into next available register (mov [sp + offset(ident)] -> tx)
+                    return Ok((
+                        vec![IRInstruction::Mov(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
+                        match &target { Some(_) => 0, _ => 1 },
+                        match target { Some(t) => t, _ => Operand::Temporary(reserved) }
+                    ))
                 },
                 _ => ()
             };
-            // Load into next available register (mov [sp + offset(ident)] -> tx)
-            return Ok((
-                vec![IRInstruction::Mov(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
-                match &target { Some(_) => 0, _ => 1 },
-                match target { Some(t) => t, _ => Operand::Temporary(reserved) }
-            ))
+            return Ok((Vec::new(),0,Operand::Variable(ident.clone())))
         },
         ExpressionBody::CallExpression(fname, alist) => {
             // Lookup function
@@ -400,7 +400,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
 pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), String> {
     // Open file
     let mut file = match OpenOptions::new()
-        .create_new(true)
+        .create(true)
         .write(true)
         .truncate(true)
         .open(path) {
