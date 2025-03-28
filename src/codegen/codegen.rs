@@ -2,7 +2,7 @@ use crate::parser::parser::*;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::collections::HashMap;
-
+use std::sync::atomic::{AtomicUsize,Ordering};
 
 pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type)>;
 
@@ -224,7 +224,9 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable, reserved: &mut usize) -> Result<Vec<Vec<IRInstruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable) -> Result<Vec<Vec<IRInstruction>>, String> {
+    // Unique label counter
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
     // Instructions vector
     let mut instrs = Vec::new();
     // Handle passthrough
@@ -284,7 +286,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::BlockStmt(bl2) => {
                 // Generate instructions for block
-                let mut newinstrs = basic_blocks(bl2, st, main, None, ft, reserved)?;
+                let mut newinstrs = basic_blocks(bl2, st, main, None, ft)?;
                 // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                 for x in newinstrs.drain(0..1).next().unwrap() {
                     instrs.last_mut().unwrap().push(x)
@@ -301,14 +303,14 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     instrs.last_mut().unwrap().push(x);
                 }
                 // Labels for if statement
-                let endlabel = "_end".to_string() + &reserved.to_string();
-                let faillabel = "_fail".to_string() + &reserved.to_string();
-                // Up reserved counter
-                *reserved += 1;
+                let endlabel = "_end".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
+                let faillabel = "_fail".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
+                // Increment reserved counter
+                COUNTER.store(COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                 // Add branch instruction
                 instrs.last_mut().unwrap().push(IRInstruction::Beqz(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
                 // Generate code for take condition
-                let mut tblocks = basic_blocks(b1, st, main, None, ft, reserved)?;
+                let mut tblocks = basic_blocks(b1, st, main, None, ft)?;
                 // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                 for x in tblocks.drain(0..1).next().unwrap() {
                     instrs.last_mut().unwrap().push(x)
@@ -327,7 +329,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                         // Push fail label onto instrs
                         instrs.last_mut().unwrap().push(IRInstruction::Label(faillabel));
                         // Generate code blocks
-                        let mut fblocks = basic_blocks(b2, st, main, None, ft, reserved)?;
+                        let mut fblocks = basic_blocks(b2, st, main, None, ft)?;
                         // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                         for x in fblocks.drain(0..1).next().unwrap() {
                             instrs.last_mut().unwrap().push(x)
@@ -346,9 +348,9 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::WhileStmt(condition, body) => {
                 // Generate labels
-                let loopstart = "_loopstart".to_string() + &reserved.to_string();
-                let loopend = "_loopend".to_string() + &reserved.to_string();
-                *reserved += 1;
+                let loopstart = "_loopstart".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
+                let loopend = "_loopend".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
+                COUNTER.store(COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                 // Make a new basic block
                 instrs.push(Vec::new());
                 // Push start label onto the block
@@ -360,7 +362,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Jump out of loop if condition is zero
                 instrs.last_mut().unwrap().push(IRInstruction::Beqz(operand, loopend.clone()));
                 // Generate code for loop body
-                let mut lblocks = basic_blocks(body, st, main, None, ft, reserved)?;
+                let mut lblocks = basic_blocks(body, st, main, None, ft)?;
                 // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                 for x in lblocks.drain(0..1).next().unwrap() { instrs.last_mut().unwrap().push(x) };
                 // Push the rest of the basic blocks onto new vectors
@@ -395,8 +397,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut counter: usize = 0;
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), &ft, &mut counter)?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), &ft)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
