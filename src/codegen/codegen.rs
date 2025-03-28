@@ -400,6 +400,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
 pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), String> {
     // Open file
     let mut file = match OpenOptions::new()
+        .create_new(true)
         .write(true)
         .truncate(true)
         .open(path) {
