@@ -337,7 +337,34 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // End label
                 instrs.last_mut().unwrap().push(IRInstruction::Label(endlabel));
             },
-            _ => panic!()
+            StatementBody::WhileStmt(condition, body) => {
+                // Generate labels
+                let loopstart = "_loopstart".to_string() + &reserved.to_string();
+                let loopend = "_loopend".to_string() + &reserved.to_string();
+                *reserved += 1;
+                // Make a new basic block
+                instrs.push(Vec::new());
+                // Push start label onto the block
+                instrs.last_mut().unwrap().push(IRInstruction::Label(loopstart.clone()));
+                // Generate condition checking code
+                let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, st, bl.1, ft)?;
+                // Push condition code
+                for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().push(instr) }
+                // Jump out of loop if condition is zero
+                instrs.last_mut().unwrap().push(IRInstruction::Beqz(operand, loopend.clone()));
+                // Generate code for loop body
+                let mut lblocks = basic_blocks(body, st, main, None, ft, reserved)?;
+                // Push first generated basic block onto existing basic block (guaranteed to return at least one)
+                for x in lblocks.drain(0..1).next().unwrap() { instrs.last_mut().unwrap().push(x) };
+                // Push the rest of the basic blocks onto new vectors
+                for x in lblocks { instrs.push(x) };
+                // Jump back to loop start
+                instrs.last_mut().unwrap().push(IRInstruction::Jump(loopstart));
+                // New basic block
+                instrs.push(Vec::new());
+                // Add loopend label
+                instrs.last_mut().unwrap().push(IRInstruction::Label(loopend));
+            }
         }
     };
     // End of block; pop stack
