@@ -11,16 +11,16 @@ pub enum Operand {
     Temporary(usize),
     Immediate(i32),
     Variable(String),
-    Parameter(String),
+    Parameter(usize),
     Return
 }
 impl ToString for Operand {
     fn to_string(&self) -> String {
         match self {
             Operand::Temporary(x) => "t".to_string() + &x.to_string(),
+            Operand::Parameter(x) => "p".to_string() + &x.to_string(),
             Operand::Immediate(x) => "#".to_string() + &x.to_string(),
             Operand::Variable(s) => s.clone(),
-            Operand::Parameter(s) => "p(".to_string() + s + ")",
             Operand::Return => "ret".to_string()
         }
     }
@@ -202,7 +202,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     }
                 };
                 // Move result into parameter slot
-                instrs.push(IRInstruction::Mov(operand, Operand::Parameter(finfo.0[i].0.clone())))
+                instrs.push(IRInstruction::Mov(operand, Operand::Parameter(i)))
             };
             // Jump to label for function
             instrs.push(IRInstruction::Call(fname.clone()));
