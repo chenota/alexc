@@ -206,11 +206,18 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             };
             // Jump to label for function
             instrs.push(IRInstruction::Call(fname.clone()));
+            // If targeting a register that's not return register, generate mov instruction
+            match &target {
+                Some(r) => if *r != Operand::Return {
+                    instrs.push(IRInstruction::Mov(Operand::Return, r.clone()))
+                },
+                _ => ()
+            };
             // Return list
             return Ok((
                 instrs, 
                 0,
-                Operand::Return
+                match target { Some(r) => r, _ => Operand::Return }
             ));
         },
         _ => panic!()
