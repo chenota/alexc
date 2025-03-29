@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize,Ordering};
 
 pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type)>;
+pub type BasicBlock = (Vec<IRInstruction>, usize);
 
 #[derive(Clone)]
 pub enum Operand {
@@ -212,18 +213,18 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable) -> Result<Vec<Vec<IRInstruction>>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable) -> Result<Vec<BasicBlock>, String> {
     // Unique label counter
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     // Instructions vector
     let mut instrs = Vec::new();
     // Handle passthrough
-    instrs.push(match passthrough {
+    instrs.push((match passthrough {
         Some(v) => v,
         _ => Vec::new()
-    });
+    }, bl.1));
     // Push stack
-    instrs.last_mut().unwrap().push(IRInstruction::PushScope(bl.1));
+    instrs.last_mut().unwrap().0.push(IRInstruction::PushScope(bl.1));
     // Flag to pop stack at very end of block
     let mut fpop: bool = true;
     // Loop through each statement in block
@@ -232,25 +233,25 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             StatementBody::ExprStatement((e, _)) => {
                 // Generate code for expression, extend most recent basic block
                 for x in expression_cg(e, 0, None, ft)?.0.drain(..) {
-                    instrs.last_mut().unwrap().push(x)
+                    instrs.last_mut().unwrap().0.push(x)
                 };
             },
             StatementBody::ReturnStatement((e, _)) => {
                 // Generate code for expression
                 let (mut code, _, operand) = expression_cg(e, 0, None, ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x)
+                    instrs.last_mut().unwrap().0.push(x)
                 };
                 // Pop stack
-                instrs.last_mut().unwrap().push(IRInstruction::PopScope(bl.1));
+                instrs.last_mut().unwrap().0.push(IRInstruction::PopScope(bl.1));
                 fpop = false;
                 // Special case for main
                 if main {
                     // Do exit
-                    instrs.last_mut().unwrap().push(IRInstruction::Exit(operand));
+                    instrs.last_mut().unwrap().0.push(IRInstruction::Exit(operand));
                 } else {
                     // Push return instruction
-                    instrs.last_mut().unwrap().push(IRInstruction::Return);
+                    instrs.last_mut().unwrap().0.push(IRInstruction::Return);
                 }
             },
             StatementBody::LetStmt((id, ty), e) => {
@@ -260,27 +261,23 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     _ => return Err("Type must be an int".to_string())
                 };
                 // Generate declare instruction
-                instrs.last_mut().unwrap().push(IRInstruction::Declare(id.clone()));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Declare(id.clone()));
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x);
+                    instrs.last_mut().unwrap().0.push(x);
                 }
             },
             StatementBody::AssignStmt(id, e) => {
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x);
+                    instrs.last_mut().unwrap().0.push(x);
                 }
             },
             StatementBody::BlockStmt(bl2) => {
                 // Generate instructions for block
                 let mut newinstrs = basic_blocks(bl2, st, main, None, ft)?;
-                // Push first generated basic block onto existing basic block (guaranteed to return at least one)
-                for x in newinstrs.drain(0..1).next().unwrap() {
-                    instrs.last_mut().unwrap().push(x)
-                };
                 // Push the rest of the basic blocks onto new vectors
                 for x in newinstrs {
                     instrs.push(x)
@@ -290,7 +287,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Generate code for condition
                 let (mut code, _, operand) = expression_cg(&e.0, 0, None, ft)?;
                 for x in code.drain(..) {
-                    instrs.last_mut().unwrap().push(x);
+                    instrs.last_mut().unwrap().0.push(x);
                 }
                 // Labels for if statement
                 let endlabel = "_end".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
@@ -298,31 +295,27 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Increment reserved counter
                 COUNTER.store(COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                 // Add branch instruction
-                instrs.last_mut().unwrap().push(IRInstruction::JumpIfZero(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
+                instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
                 // Generate code for take condition
                 let mut tblocks = basic_blocks(b1, st, main, None, ft)?;
-                // Push first generated basic block onto existing basic block (guaranteed to return at least one)
-                for x in tblocks.drain(0..1).next().unwrap() {
-                    instrs.last_mut().unwrap().push(x)
-                };
                 // Push the rest of the basic blocks onto new vectors
                 for x in tblocks {
                     instrs.push(x)
                 }
                 // Jump to end label if fail code follows take code
-                if b2.is_some() { instrs.last_mut().unwrap().push(IRInstruction::Jump(endlabel.clone())) };
+                if b2.is_some() { instrs.last_mut().unwrap().0.push(IRInstruction::Jump(endlabel.clone())) };
                 // Generate code for fail condition if need to
                 match b2 {
                     Some(b2) => {
                         // New basic block
-                        instrs.push(Vec::new());
+                        instrs.push((Vec::new(), b2.1));
                         // Push fail label onto instrs
-                        instrs.last_mut().unwrap().push(IRInstruction::Label(faillabel));
+                        instrs.last_mut().unwrap().0.push(IRInstruction::Label(faillabel));
                         // Generate code blocks
                         let mut fblocks = basic_blocks(b2, st, main, None, ft)?;
                         // Push first generated basic block onto existing basic block (guaranteed to return at least one)
-                        for x in fblocks.drain(0..1).next().unwrap() {
-                            instrs.last_mut().unwrap().push(x)
+                        for x in fblocks.drain(0..1).next().unwrap().0 {
+                            instrs.last_mut().unwrap().0.push(x)
                         };
                         // Push the rest of the basic blocks onto new vectors
                         for x in fblocks {
@@ -332,9 +325,9 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     None => ()
                 };
                 // New basic block
-                instrs.push(Vec::new());
+                instrs.push((Vec::new(), bl.1));
                 // End label
-                instrs.last_mut().unwrap().push(IRInstruction::Label(endlabel));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Label(endlabel));
             },
             StatementBody::WhileStmt(condition, body) => {
                 // Generate labels
@@ -342,37 +335,35 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 let loopend = "_loopend".to_string() + &COUNTER.load(Ordering::Relaxed).to_string();
                 COUNTER.store(COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                 // Make a new basic block
-                instrs.push(Vec::new());
+                instrs.push((Vec::new(), bl.1));
                 // Push start label onto the block
-                instrs.last_mut().unwrap().push(IRInstruction::Label(loopstart.clone()));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Label(loopstart.clone()));
                 // Generate condition checking code
                 let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, ft)?;
                 // Push condition code
-                for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().push(instr) }
+                for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().0.push(instr) }
                 // Jump out of loop if condition is zero
-                instrs.last_mut().unwrap().push(IRInstruction::JumpIfZero(operand, loopend.clone()));
+                instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, loopend.clone()));
                 // Generate code for loop body
                 let mut lblocks = basic_blocks(body, st, main, None, ft)?;
-                // Push first generated basic block onto existing basic block (guaranteed to return at least one)
-                for x in lblocks.drain(0..1).next().unwrap() { instrs.last_mut().unwrap().push(x) };
                 // Push the rest of the basic blocks onto new vectors
                 for x in lblocks { instrs.push(x) };
                 // Jump back to loop start
-                instrs.last_mut().unwrap().push(IRInstruction::Jump(loopstart));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Jump(loopstart));
                 // New basic block
-                instrs.push(Vec::new());
+                instrs.push((Vec::new(), bl.1));
                 // Add loopend label
-                instrs.last_mut().unwrap().push(IRInstruction::Label(loopend));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Label(loopend));
             }
         }
     };
     // End of block; pop stack
-    if fpop { instrs.last_mut().unwrap().push(IRInstruction::PopScope(bl.1)) };
+    if fpop { instrs.last_mut().unwrap().0.push(IRInstruction::PopScope(bl.1)) };
     // Return
     Ok(instrs)
 }
 
-pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTable), String> {
+pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), String> {
     // Make prog mutable
     let (funs, mut st) = prog;
     // Construct function table from program
@@ -395,7 +386,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<Vec<IRInstruction>>, SymbolTa
     Ok((blocks, st))
 }
 
-pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), String> {
+pub fn ir_to_file(ir: Vec<BasicBlock>, path: String) -> Result<(), String> {
     // Open file
     let mut file = match OpenOptions::new()
         .create(true)
@@ -407,7 +398,7 @@ pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), Strin
     };
     // Write lines to file
     for block in ir {
-        for instr in block {
+        for instr in block.0 {
             if let Err(e) = writeln!(file, "{}", instr.to_string()) {
                 return Err(e.to_string());
             }
@@ -570,7 +561,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     instrs
 }
 
-pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
+pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
     for _ in 0..16 { rt.push(Vec::new()) };
@@ -579,7 +570,7 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
     // Empty instructions vector
     let mut instrs = Vec::new();
     // Iterate through each IR instruction in the basic block
-    for instr in bb {
+    for instr in bb.0 {
         match instr {
             IRInstruction::Label(s) => {
                 instrs.push(X86Instruction::Label(s))
@@ -626,7 +617,7 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
     Ok(instrs)
 }
 
-pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: SymbolTable) -> Result<Vec<X86Instruction>, String> {
+pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Make symbol table mutable
     let mut st = st;
     // Empty instructions vector
