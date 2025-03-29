@@ -492,7 +492,52 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
                 instrs.push(X86Instruction::Label(s))
             },
             IRInstruction::Mov(o1, o2) => {
-                
+                // Generate x86 operand for IR first operand
+                let ox1 = match o1 {
+                    Operand::Immediate(x) => X86Operand::Immediate(x),
+                    Operand::Temporary(x) => {
+                        // Get temporary table entry for this value
+                        let entry = tt.entry(x).or_insert((None, None)).clone();
+                        // Check where I can find this value
+                        match entry {
+                            // Not anywhere, can't move nonexistant value
+                            (None, None) => panic!(),
+                            // Already in a register
+                            (Some(r), _) => X86Operand::Register(r),
+                            // In memory
+                            (_, Some(m)) => {
+                                // TODO copy from memory into register
+                                // This is where I use generic scoring algorithm
+                                panic!()
+                            }
+                        }
+                    }
+                    _ => panic!()
+                };
+                // Generate x86 operand for IR second operand
+                let ox2 = match o2 {
+                    Operand::Temporary(x) => {
+                        // Get temporary table entry for this value
+                        let entry = tt.entry(x).or_insert((None, None)).clone();
+                        // Check where I can find this value
+                        match entry {
+                            // Not anywhere
+                            (None, None) => {
+                                // TODO find a register to hold this value
+                                panic!()
+                            },
+                            // Already in a register
+                            (Some(r), _) => X86Operand::Register(r),
+                            // In memory OR not anywhere
+                            (_, Some(m)) => {
+                                // TODO find a register to put this value in (don't need to copy)
+                                // This is where I use generic scoring algorithm
+                                panic!()
+                            }
+                        }
+                    }
+                    _ => panic!()
+                };
             },
             _ => ()
         }
