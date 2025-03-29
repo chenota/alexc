@@ -14,9 +14,14 @@ impl Type {
     }
 }
 
+pub enum ValueLocation {
+    Register(usize),
+    Memory(usize)
+}
+
 pub type Program = (HashMap<Ident, Function>, SymbolTable);
 pub type Function = (ForceTypedIdentList, Type, Block, Location);
-pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, bool, )>)>; // Type, byte offset in stack, has been declared in this scope
+pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, bool, Vec<ValueLocation>, )>)>; // Type, byte offset in stack, has been declared in this scope, location(s) stored at
 pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
@@ -221,7 +226,7 @@ impl Parser {
         // Create symbol table entry just for function parameters (this allows for redefining in body)
         let mut vars = HashMap::new();
         for (id, typ) in &idlist {
-            match vars.insert(id.clone(), (typ.clone(), 0, true)) {
+            match vars.insert(id.clone(), (typ.clone(), 0, true, Vec::new())) {
                 None => (),
                 Some(_) => return Err(self.generic_err("Duplicate function parameters"))
             }
@@ -280,7 +285,7 @@ impl Parser {
             self.expect_err(TokenType::Semi)?;
             // Create a new symbol table entry for parent scope
             // TODO in future: type inference to figure out type rather than crashing if no type provided
-            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(), 0, false)) {
+            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(), 0, false, Vec::new())) {
                 Some(_) => return Err(self.generic_err("Duplicate variables in scope")),
                 _ => ()
             };

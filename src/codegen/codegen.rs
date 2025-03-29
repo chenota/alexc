@@ -86,6 +86,22 @@ impl ToString for IRInstruction {
     }
 }
 
+#[derive(Clone)]
+pub enum X86Instruction {
+
+}
+impl ToString for X86Instruction {
+    fn to_string(&self) -> String {
+        String::from("Hi")
+    }
+}
+
+pub enum RegisterValue {
+    Variable(String),
+    Temporary(usize)
+}
+pub type RegisterTable = Vec<Vec<RegisterValue>>;
+
 pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
@@ -427,5 +443,32 @@ pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), Strin
             }
         }
     };
+    Ok(())
+}
+
+pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable, rt: &mut RegisterTable, scope: usize) -> Result<Vec<X86Instruction>, String> {
+
+}
+
+pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
+
+}
+
+pub fn x86_to_file(x86: Vec<X86Instruction>, path: String) -> Result<(), String> {
+    // Open file
+    let mut file = match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path) {
+        Ok(f) => f,
+        Err(e) => return Err(e.to_string())
+    };
+    // Write lines to file
+    for instr in x86 {
+        if let Err(e) = writeln!(file, "{}", instr.to_string()) {
+            return Err(e.to_string());
+        }
+    }
     Ok(())
 }
