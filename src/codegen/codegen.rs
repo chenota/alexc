@@ -455,7 +455,7 @@ impl ToString for X86Instruction {
         }
     }
 }
-
+#[derive(Clone)]
 pub enum RegisterValue {
     Variable(String),
     Temporary(usize)
@@ -491,18 +491,16 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
             // Check out the value
             match value {
                 // Holding a variable value
-                RegisterValue::Variable(ident) => match st_lookup(ident, st, scope) {
-                    // Variable is in-scope
-                    Some(scope) => {
-                        match st[scope].1.get(ident).unwrap().3.1 {
-                            // In memory
-                            Some(_) => score += 1,
-                            // Not in memory
-                            None => score += 2
-                        }
-                    },
-                    // Variable is out-of-scope
-                    None => ()
+                RegisterValue::Variable(ident) => {
+                    // Get scope of variable (should always be in scope)
+                    let scope = st_lookup(ident, st, scope).unwrap();
+                    // Figure out where value is stored
+                    match st[scope].1.get(ident).unwrap().3.1 {
+                        // In memory
+                        Some(_) => score += 1,
+                        // Not in memory
+                        None => score += 2
+                    }
                 },
                 // Holding a temporary value
                 RegisterValue::Temporary(x) => match tt.get(x).unwrap().1 {
@@ -531,6 +529,42 @@ pub fn best_register(rankings: &Vec<usize>, restrict: Vec<usize>) -> usize {
     };
     // Return index of register with best score
     rankings.iter().enumerate().position(|(i,r)| !restrict.contains(&i) && *r == best_register_score).unwrap()
+}
+
+pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable) -> Vec<X86Instruction> {
+    // Instructions needed to perform allocation
+    let mut instrs = Vec::new();
+    // Check which values this register stores
+    for value in rt.get(register).unwrap().clone() {
+        // Check which kind of value
+        match value {
+            RegisterValue::Variable(ident) => {
+                // Get scope of variable (should always be in scope)
+                let scope = st_lookup(&ident, st, scope).unwrap();
+                // Invalidate register entry for variable
+                st.get_mut(scope).unwrap().1.get_mut(&ident).unwrap().3.0 = None;
+                // Figure out where is stored
+                match st[scope].1.get(&ident).unwrap().3.1 {
+                    // In memory (don't do anything)
+                    Some(_) => (),
+                    // Not in memory (TODO allocate to stack)
+                    None => panic!()
+                }
+            },
+            RegisterValue::Temporary(x) => {
+                // Invalidate register entry for variable
+                tt.get_mut(&x).unwrap().0 = None;
+                // Figure out where is stored
+                match tt.get(&x).unwrap().1 {
+                    // In memory (don't do anything)
+                    Some(_) => (),
+                    // Not in memory (TODO allocate to stack)
+                    None => panic!()
+                }
+            }
+        }
+    };
+    instrs
 }
 
 pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
@@ -568,8 +602,10 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
                                     let rankings = rank_registers(st, 0, &tt, &rt);
                                     // Get register with smallest ranking
                                     let selected_register = best_register(&rankings, Vec::new());
-                                    // 
-                                    ()
+                                    // Allocate selected register (TODO attach scope)
+                                    for instr in ralloc(selected_register, st, 0, &mut tt, &mut rt) { instrs.push(instr) };
+                                    // Return selected register
+                                    (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                                 }
                             }
                         }
