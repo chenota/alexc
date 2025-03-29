@@ -86,23 +86,6 @@ impl ToString for IRInstruction {
     }
 }
 
-#[derive(Clone)]
-pub enum X86Instruction {
-
-}
-impl ToString for X86Instruction {
-    fn to_string(&self) -> String {
-        String::from("Hi")
-    }
-}
-
-pub enum RegisterValue {
-    Variable(String),
-    Temporary(usize)
-}
-pub type RegisterTable = Vec<Vec<RegisterValue>>;
-pub type TemporaryTable = HashMap<usize, ValueLocation>;
-
 pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
@@ -447,12 +430,81 @@ pub fn ir_to_file(ir: Vec<Vec<IRInstruction>>, path: String) -> Result<(), Strin
     Ok(())
 }
 
-pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable, rt: &mut RegisterTable, scope: usize) -> Result<Vec<X86Instruction>, String> {
+pub enum X86Operand {
+    Register(usize),
+    Immediate(i32)
+}
 
+#[derive(Clone)]
+pub enum X86Instruction {
+    Label(String),
+}
+impl ToString for X86Instruction {
+    fn to_string(&self) -> String {
+        match self {
+            X86Instruction::Label(s) => s.clone() + ":"
+        }
+    }
+}
+
+pub enum RegisterValue {
+    Variable(String),
+    Temporary(usize)
+}
+pub type RegisterTable = Vec<Vec<RegisterValue>>;
+pub type TemporaryTable = HashMap<usize, Vec<ValueLocation>>;
+
+fn operand_ir_to_x86(o: &Operand, restrict: Vec<X86Operand>, st: &mut SymbolTable, rt: &mut RegisterTable, tt: &mut TemporaryTable) -> Result<(X86Operand, Vec<X86Instruction>), String> {
+    match o {
+        Operand::Immediate(v) => Ok((X86Operand::Immediate(*v), Vec::new())),
+        _ => todo!()
+    }
+}
+
+pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
+    // Generate register table for this basic block
+    let mut rt: RegisterTable = Vec::new();
+    for _ in 0..16 { rt.push(Vec::new()) };
+    // Generate temporary table for this basic block
+    let mut tt: TemporaryTable = HashMap::new();
+    // Empty instructions vector
+    let mut instrs = Vec::new();
+    // Iterate through each IR instruction in the basic block
+    for instr in bb {
+        match instr {
+            IRInstruction::Label(s) => {
+                instrs.push(X86Instruction::Label(s))
+            },
+            IRInstruction::Mov(o1, o2) => {
+                // Find space for the first operand
+                let (ox1, instrs1) = operand_ir_to_x86(&o1, Vec::new(), st, &mut rt, &mut tt)?;
+                // Push instructions
+                for instr in instrs1 { instrs.push(instr) };
+                // Find space for the second operand
+                let (ox2, instrs2) = operand_ir_to_x86(&o1, Vec::new(), st, &mut rt, &mut tt)?;
+                // Push instructions
+                for instr in instrs2 { instrs.push(instr) };
+            },
+            _ => ()
+        }
+    };
+    // Return
+    Ok(instrs)
 }
 
 pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: SymbolTable) -> Result<Vec<X86Instruction>, String> {
-
+    // Make symbol table mutable
+    let mut st = st;
+    // Empty instructions vector
+    let mut instrs = Vec::new();
+    // Add instructions for each basic block
+    for bb in ir {
+        for instr in bb_to_x86(bb, &mut st)? {
+            instrs.push(instr)
+        }
+    };
+    // Return
+    Ok(instrs)
 }
 
 pub fn x86_to_file(x86: Vec<X86Instruction>, path: String) -> Result<(), String> {
