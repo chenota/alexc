@@ -518,6 +518,21 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
     }).collect()
 }
 
+pub fn best_register(rankings: &Vec<usize>, restrict: Vec<usize>) -> usize {
+    // Store best register
+    let mut best_register_score: usize = std::usize::MAX;
+    // Iterate through rankings
+    for (i, ranking) in rankings.iter().enumerate() {
+        // Only consider unrestricted registers
+        if !restrict.contains(&i) {
+            // Update score
+            best_register_score = best_register_score.min(*ranking);
+        }
+    };
+    // Return index of register with best score
+    rankings.iter().enumerate().position(|(i,r)| !restrict.contains(&i) && *r == best_register_score).unwrap()
+}
+
 pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
@@ -549,8 +564,12 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
                                 _ => {
                                     // Invalidate memory value if exists
                                     tt.get_mut(&y).unwrap().1 = None;
-                                    // TODO find new register
-                                    panic!()
+                                    // Rank registers (TODO attach scope to basic blocks)
+                                    let rankings = rank_registers(st, 0, &tt, &rt);
+                                    // Get register with smallest ranking
+                                    let selected_register = best_register(&rankings, Vec::new());
+                                    // 
+                                    ()
                                 }
                             }
                         }
