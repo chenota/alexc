@@ -251,7 +251,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::ReturnStatement((e, _)) => {
                 // Generate code for expression
-                let (mut code, _, operand) = expression_cg(e, 0, Some(Operand::Return), ft)?;
+                let (mut code, _, operand) = expression_cg(e, 0, None, ft)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().push(x)
                 };
