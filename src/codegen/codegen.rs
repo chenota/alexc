@@ -414,6 +414,7 @@ pub enum X86Operand {
     StackPointer,
     BasePointer,
     InstructionPointer,
+    Memory(Box<X86Operand>, bool, usize)
 }
 impl ToString for X86Operand {
     fn to_string(&self) -> String {
@@ -430,7 +431,8 @@ impl ToString for X86Operand {
             },
             X86Operand::StackPointer => "rsp".to_string(),
             X86Operand::BasePointer => "rbp".to_string(),
-            X86Operand::InstructionPointer => "rip".to_string()
+            X86Operand::InstructionPointer => "rip".to_string(),
+            X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]"
         }
     }
 }
@@ -439,14 +441,18 @@ impl ToString for X86Operand {
 pub enum X86Instruction {
     Global,
     Label(String),
-    Move(X86Operand, X86Operand)
+    Move(X86Operand, X86Operand),
+    Push(X86Operand),
+    Sub(X86Operand, X86Operand)
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
         match self {
             X86Instruction::Label(s) => s.clone() + ":",
             X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + " " + &o2.to_string(),
-            X86Instruction::Global => "global _main".to_string()
+            X86Instruction::Global => "global _main".to_string(),
+            X86Instruction::Push(o1) => "push ".to_string() + &o1.to_string(),
+            X86Instruction::Sub(o1, o2) => "sub ".to_string() + &o1.to_string() + " " + &o2.to_string()
         }
     }
 }
@@ -526,7 +532,7 @@ pub fn best_register(rankings: &Vec<usize>, restrict: Vec<usize>) -> usize {
     rankings.iter().enumerate().position(|(i,r)| !restrict.contains(&i) && *r == best_register_score).unwrap()
 }
 
-pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable) -> Vec<X86Instruction> {
+pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
     // Instructions needed to perform allocation
     let mut instrs = Vec::new();
     // Check which values this register stores
@@ -542,19 +548,31 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
                 match st[scope].1.get(ident).unwrap().3.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
-                    // Not in memory (TODO allocate to stack)
-                    None => panic!()
+                    // Not in memory
+                    None => {
+                        // Find location of variable in memory
+                        let mem_location = st[scope].1.get(ident).unwrap().1;
+                        // Move to location
+                        instrs.push(X86Instruction::Move(X86Operand::Register(register), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, mem_location)));
+                    }
                 }
             },
             RegisterValue::Temporary(x) => {
                 // Invalidate register entry for variable
-                tt.get_mut(&x).unwrap().0 = None;
+                tt.get_mut(x).unwrap().0 = None;
                 // Figure out where is stored
-                match tt.get(&x).unwrap().1 {
+                match tt.get(x).unwrap().1 {
                     // In memory (don't do anything)
                     Some(_) => (),
-                    // Not in memory (TODO allocate to stack)
-                    None => panic!()
+                    // Not in memory
+                    None => {
+                        // Update stack size
+                        *stackoffset += 8;
+                        // Update memory location
+                        tt.get_mut(x).unwrap().1 = Some(*stackoffset);
+                        // Push register to stack
+                        instrs.push(X86Instruction::Push(X86Operand::Register(register)))
+                    }
                 }
             }
         }
@@ -565,7 +583,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     instrs
 }
 
-pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
+pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
     for _ in 0..14 { rt.push(Vec::new()) };
@@ -601,7 +619,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable) -> Result<Vec<X86Instruct
                                     // Get register with smallest ranking
                                     let selected_register = best_register(&rankings, Vec::new());
                                     // Allocate selected register
-                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt) { instrs.push(instr) };
+                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
                                     // Return selected register
                                     (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                                 }
@@ -628,9 +646,11 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruct
     let mut instrs = vec![
         X86Instruction::Global
     ];
+    // Base stack pointer
+    let mut stackoffset: usize = 0;
     // Add instructions for each basic block
     for bb in ir {
-        for instr in bb_to_x86(bb, &mut st)? {
+        for instr in bb_to_x86(bb, &mut st, &mut stackoffset)? {
             instrs.push(instr)
         }
     };

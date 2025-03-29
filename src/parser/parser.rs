@@ -16,7 +16,7 @@ impl Type {
 
 pub type Program = (HashMap<Ident, Function>, SymbolTable);
 pub type Function = (ForceTypedIdentList, Type, Block, Location);
-pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, bool, (Option<usize>, Option<usize>), )>)>; // Type, byte offset in stack, has been declared in this scope, location(s) stored at
+pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, bool, (Option<usize>, Option<usize>), )>)>; // Type, byte offset from base pointer, has been declared in this scope, location(s) stored at
 pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
