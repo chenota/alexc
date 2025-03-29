@@ -65,7 +65,8 @@ pub enum IRInstruction {
     Fpush(usize),
     Fpop,
     Beqz(Operand, String),
-    Jump(String)
+    Jump(String),
+    Declare(String)
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
@@ -79,7 +80,8 @@ impl ToString for IRInstruction {
             IRInstruction::Fpush(x) => "fpush ".to_string() + &x.to_string(),
             IRInstruction::Fpop => "fpop".to_string(),
             IRInstruction::Beqz(op, s) => "beqz ".to_string() + &op.to_string() + " " + s,
-            IRInstruction::Jump(s) => "jump ".to_string() + s
+            IRInstruction::Jump(s) => "jump ".to_string() + s,
+            IRInstruction::Declare(s) => "declare ".to_string() + s,
         }
     }
 }
@@ -271,6 +273,8 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     Some(Type::Int) => (),
                     _ => return Err("Type must be an int".to_string())
                 };
+                // Generate declare instruction
+                instrs.last_mut().unwrap().push(IRInstruction::Declare(id.clone()));
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
                 for x in code.drain(..) {
