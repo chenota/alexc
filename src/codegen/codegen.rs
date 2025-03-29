@@ -535,16 +535,16 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     // Instructions needed to perform allocation
     let mut instrs = Vec::new();
     // Check which values this register stores
-    for value in rt.get(register).unwrap().clone() {
+    for value in rt.get(register).unwrap() {
         // Check which kind of value
         match value {
             RegisterValue::Variable(ident) => {
                 // Get scope of variable (should always be in scope)
                 let scope = st_lookup(&ident, st, scope).unwrap();
                 // Invalidate register entry for variable
-                st.get_mut(scope).unwrap().1.get_mut(&ident).unwrap().3.0 = None;
+                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
                 // Figure out where is stored
-                match st[scope].1.get(&ident).unwrap().3.1 {
+                match st[scope].1.get(ident).unwrap().3.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory (TODO allocate to stack)
@@ -564,6 +564,9 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
             }
         }
     };
+    // Clear register table entry for this register
+    rt[register].clear();
+    // Return
     instrs
 }
 
