@@ -630,7 +630,9 @@ pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: SymbolTable) -> Result<Vec<X86
     // Make symbol table mutable
     let mut st = st;
     // Empty instructions vector
-    let mut instrs = Vec::new();
+    let mut instrs = vec![
+        X86Instruction::Global
+    ];
     // Add instructions for each basic block
     for bb in ir {
         for instr in bb_to_x86(bb, &mut st)? {
