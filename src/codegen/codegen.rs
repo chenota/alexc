@@ -451,7 +451,7 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable, rt: &mut Register
 
 }
 
-pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
+pub fn ir_to_x86(ir: Vec<Vec<IRInstruction>>, st: SymbolTable) -> Result<Vec<X86Instruction>, String> {
 
 }
 

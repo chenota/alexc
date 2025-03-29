@@ -51,5 +51,29 @@ fn main() {
                 std::process::exit(1)
             }
         };
+    } else {
+        // Parse
+        let mut p = parser::parser::Parser::new(input);
+        let program = match p.parse() {
+            Ok(prog) => prog,
+            Err(s) => { eprintln!("{}", s); std::process::exit(1) }
+        };
+        // Generate IR from program
+        let ir = match program_to_ir(program) {
+            Ok(ir) => ir,
+            Err(s) => { eprintln!("{}", s); std::process::exit(1) }
+        };
+        let x86 = match ir_to_x86(ir.0, ir.1) {
+            Ok(x86) => x86,
+            Err(s) => { eprintln!("{}", s); std::process::exit(1) }
+        };
+        // Generate x86 instructions from IR
+        match x86_to_file(x86, args.out) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("{}", e.to_string());
+                std::process::exit(1)
+            }
+        };
     }
 }
