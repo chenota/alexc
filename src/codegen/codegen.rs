@@ -592,12 +592,12 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable) -> Result<Vec<X86Instruct
                                 _ => {
                                     // Invalidate memory value if exists
                                     tt.get_mut(&y).unwrap().1 = None;
-                                    // Rank registers (TODO attach scope to basic blocks)
-                                    let rankings = rank_registers(st, 0, &tt, &rt);
+                                    // Rank registers
+                                    let rankings = rank_registers(st, bb.1, &tt, &rt);
                                     // Get register with smallest ranking
                                     let selected_register = best_register(&rankings, Vec::new());
-                                    // Allocate selected register (TODO attach scope)
-                                    for instr in ralloc(selected_register, st, 0, &mut tt, &mut rt) { instrs.push(instr) };
+                                    // Allocate selected register
+                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt) { instrs.push(instr) };
                                     // Return selected register
                                     (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                                 }
