@@ -101,6 +101,7 @@ pub enum RegisterValue {
     Temporary(usize)
 }
 pub type RegisterTable = Vec<Vec<RegisterValue>>;
+pub type TemporaryTable = HashMap<usize, ValueLocation>;
 
 pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
     // Check if entry exists in current entry
