@@ -410,7 +410,10 @@ pub fn ir_to_file(ir: Vec<BasicBlock>, path: String) -> Result<(), String> {
 #[derive(Clone)]
 pub enum X86Operand {
     Register(usize),
-    Immediate(i32)
+    Immediate(i32),
+    StackPointer,
+    BasePointer,
+    InstructionPointer,
 }
 impl ToString for X86Operand {
     fn to_string(&self) -> String {
@@ -423,10 +426,11 @@ impl ToString for X86Operand {
                 3 => "rbx".to_string(),
                 4 => "rsi".to_string(),
                 5 => "rdi".to_string(),
-                6 => "rsp".to_string(),
-                7 => "rbp".to_string(),
                 _ => x.to_string()
-            }
+            },
+            X86Operand::StackPointer => "rsp".to_string(),
+            X86Operand::BasePointer => "rbp".to_string(),
+            X86Operand::InstructionPointer => "rip".to_string()
         }
     }
 }
@@ -564,7 +568,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
 pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
-    for _ in 0..16 { rt.push(Vec::new()) };
+    for _ in 0..14 { rt.push(Vec::new()) };
     // Generate temporary table for this basic block
     let mut tt: TemporaryTable = HashMap::new();
     // Empty instructions vector
