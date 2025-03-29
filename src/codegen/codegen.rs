@@ -58,13 +58,13 @@ impl ToString for ArithOp {
 pub enum IRInstruction {
     Label(String),
     Arithmetic(ArithOp, Operand, Operand),
-    Mov(Operand, Operand),
+    Move(Operand, Operand),
     Return,
     Exit(Operand),
     Call(String),
-    Fpush(usize),
-    Fpop,
-    Beqz(Operand, String),
+    PushScope(usize),
+    PopScope(usize),
+    JumpIfZero(Operand, String),
     Jump(String),
     Declare(String)
 }
@@ -74,12 +74,12 @@ impl ToString for IRInstruction {
             IRInstruction::Arithmetic(op, op1, op2) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string(),
             IRInstruction::Exit(op1) => "exit ".to_string() + &op1.to_string(),
             IRInstruction::Label(s) => "label ".to_string() + &s.clone(),
-            IRInstruction::Mov(op1, op2) => "mov ".to_string() + &op1.to_string() + " " + &op2.to_string(),
+            IRInstruction::Move(op1, op2) => "move ".to_string() + &op1.to_string() + " " + &op2.to_string(),
             IRInstruction::Return => "return".to_string(),
             IRInstruction::Call(s) => "call _".to_string() + s,
-            IRInstruction::Fpush(x) => "fpush ".to_string() + &x.to_string(),
-            IRInstruction::Fpop => "fpop".to_string(),
-            IRInstruction::Beqz(op, s) => "beqz ".to_string() + &op.to_string() + " " + s,
+            IRInstruction::PushScope(x) => "scope ".to_string() + &x.to_string(),
+            IRInstruction::PopScope(x) => "unscope ".to_string() + &x.to_string(),
+            IRInstruction::JumpIfZero(op, s) => "jeqz ".to_string() + &op.to_string() + " " + s,
             IRInstruction::Jump(s) => "jump ".to_string() + s,
             IRInstruction::Declare(s) => "declare ".to_string() + s,
         }
@@ -116,7 +116,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                 // Register to move op1 into register just past op2
                 let op1reg = Operand::Temporary(reserved + op2res);
                 // Generate move instruction
-                instrs.push(IRInstruction::Mov(op1rt, op1reg.clone()));
+                instrs.push(IRInstruction::Move(op1rt, op1reg.clone()));
                 // Switch return address of op1
                 op1rt = op1reg;
             };
@@ -131,14 +131,14 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             });
             // If needed to shift registers, shift result to op2's return register
             if moved {
-                instrs.push(IRInstruction::Mov(op1rt, op2rt))
+                instrs.push(IRInstruction::Move(op1rt, op2rt))
             };
             return Ok((instrs, 1, op1code.2))
         },
         ExpressionBody::IntLiteral(sign, magnitude) => {
             // Move immediate into register
             return Ok((
-                vec![IRInstruction::Mov(Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32)), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })],
+                vec![IRInstruction::Move(Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32)), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })],
                 match &target { Some(_) => 0, _ => 1 },
                 match target { Some(t) => t, _ => Operand::Temporary(reserved) }
             ))
@@ -149,7 +149,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                 Some(t) => if *t != Operand::Variable(ident.clone()) {
                     // Load into next available register (mov [sp + offset(ident)] -> tx)
                     return Ok((
-                        vec![IRInstruction::Mov(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
+                        vec![IRInstruction::Move(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
                         match &target { Some(_) => 0, _ => 1 },
                         match target { Some(t) => t, _ => Operand::Temporary(reserved) }
                     ))
@@ -190,14 +190,14 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     }
                 };
                 // Move result into parameter slot
-                instrs.push(IRInstruction::Mov(operand, Operand::Parameter(i)))
+                instrs.push(IRInstruction::Move(operand, Operand::Parameter(i)))
             };
             // Jump to label for function
             instrs.push(IRInstruction::Call(fname.clone()));
             // If targeting a register that's not return register, generate mov instruction
             match &target {
                 Some(r) => if *r != Operand::Return {
-                    instrs.push(IRInstruction::Mov(Operand::Return, r.clone()))
+                    instrs.push(IRInstruction::Move(Operand::Return, r.clone()))
                 },
                 _ => ()
             };
@@ -223,7 +223,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         _ => Vec::new()
     });
     // Push stack
-    instrs.last_mut().unwrap().push(IRInstruction::Fpush(bl.1));
+    instrs.last_mut().unwrap().push(IRInstruction::PushScope(bl.1));
     // Flag to pop stack at very end of block
     let mut fpop: bool = true;
     // Loop through each statement in block
@@ -242,7 +242,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     instrs.last_mut().unwrap().push(x)
                 };
                 // Pop stack
-                instrs.last_mut().unwrap().push(IRInstruction::Fpop);
+                instrs.last_mut().unwrap().push(IRInstruction::PopScope(bl.1));
                 fpop = false;
                 // Special case for main
                 if main {
@@ -298,7 +298,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Increment reserved counter
                 COUNTER.store(COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
                 // Add branch instruction
-                instrs.last_mut().unwrap().push(IRInstruction::Beqz(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
+                instrs.last_mut().unwrap().push(IRInstruction::JumpIfZero(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
                 // Generate code for take condition
                 let mut tblocks = basic_blocks(b1, st, main, None, ft)?;
                 // Push first generated basic block onto existing basic block (guaranteed to return at least one)
@@ -350,7 +350,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Push condition code
                 for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().push(instr) }
                 // Jump out of loop if condition is zero
-                instrs.last_mut().unwrap().push(IRInstruction::Beqz(operand, loopend.clone()));
+                instrs.last_mut().unwrap().push(IRInstruction::JumpIfZero(operand, loopend.clone()));
                 // Generate code for loop body
                 let mut lblocks = basic_blocks(body, st, main, None, ft)?;
                 // Push first generated basic block onto existing basic block (guaranteed to return at least one)
@@ -367,7 +367,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         }
     };
     // End of block; pop stack
-    if fpop { instrs.last_mut().unwrap().push(IRInstruction::Fpop) };
+    if fpop { instrs.last_mut().unwrap().push(IRInstruction::PopScope(bl.1)) };
     // Return
     Ok(instrs)
 }
@@ -584,7 +584,7 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
             IRInstruction::Label(s) => {
                 instrs.push(X86Instruction::Label(s))
             },
-            IRInstruction::Mov(o1, o2) => {
+            IRInstruction::Move(o1, o2) => {
                 // Generate operands for move
                 let (ox1, ox2) = match o1 {
                     Operand::Immediate(x) => match o2 {
