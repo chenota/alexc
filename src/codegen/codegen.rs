@@ -86,20 +86,6 @@ impl ToString for IRInstruction {
     }
 }
 
-pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
-    // Check if entry exists in current entry
-    match table[scope].1.get(ident) {
-        // Exists, return current scope
-        Some(_) => Some(scope),
-        // Does not exist, return none if in global scope or keep looking otherwise
-        _ => if scope == 0 {
-            None
-        } else {
-            st_lookup(ident, table, table[scope].0)
-        }
-    }
-}
-
 pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
@@ -476,6 +462,61 @@ pub enum RegisterValue {
 }
 pub type RegisterTable = Vec<Vec<RegisterValue>>;
 pub type TemporaryTable = HashMap<usize, (Option<usize>, Option<usize>)>;
+
+pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<usize> {
+    // Check if entry exists in current entry
+    match table[scope].1.get(ident) {
+        // Exists, return current scope if is valid
+        Some((_, _, valid, _)) => if *valid {
+            Some(scope)
+        } else {
+            st_lookup(ident, table, table[scope].0)
+        },
+        // Does not exist, return none if in global scope or keep looking otherwise
+        _ => if scope == 0 {
+            None
+        } else {
+            st_lookup(ident, table, table[scope].0)
+        }
+    }
+}
+
+pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &RegisterTable) -> Vec<usize> {
+    // Look through each register
+    rt.iter().map(|r| {
+        // Initialize score to zero
+        let mut score = 0;
+        // For each value the register stores...
+        for value in r {
+            // Check out the value
+            match value {
+                // Holding a variable value
+                RegisterValue::Variable(ident) => match st_lookup(ident, st, scope) {
+                    // Variable is in-scope
+                    Some(scope) => {
+                        match st[scope].1.get(ident).unwrap().3.1 {
+                            // In memory
+                            Some(_) => score += 1,
+                            // Not in memory
+                            None => score += 2
+                        }
+                    },
+                    // Variable is out-of-scope
+                    None => ()
+                },
+                // Holding a temporary value
+                RegisterValue::Temporary(x) => match tt.get(x).unwrap().1 {
+                    // In memory
+                    Some(_) => score += 1,
+                    // Not in memory
+                    None => score += 2
+                }
+            }
+        };
+        // Return score for that register
+        score
+    }).collect()
+}
 
 pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
