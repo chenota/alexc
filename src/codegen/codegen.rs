@@ -477,52 +477,6 @@ pub enum RegisterValue {
 pub type RegisterTable = Vec<Vec<RegisterValue>>;
 pub type TemporaryTable = HashMap<usize, (Option<usize>, Option<usize>)>;
 
-fn regfind(st: &SymbolTable, rt: &RegisterTable, tt: &TemporaryTable, restrict: &Vec<usize>) -> (usize, Vec<X86Instruction>) {
-    // Search through register table
-    for (i, storedvalues) in rt.iter().enumerate() {
-        // If register is restricted, don't use
-        if restrict.contains(&i) { continue };
-        // If find empty register, immediately return
-        if storedvalues.len() == 0 { return (i, Vec::new()) }
-    };
-    // Temporary
-    (0, Vec::new())
-}
-
-fn operand_ir_to_x86(o: &Operand, restrict: Vec<usize>, st: &mut SymbolTable, rt: &mut RegisterTable, tt: &mut TemporaryTable) -> Result<(X86Operand, Vec<X86Instruction>), String> {
-    // Check operand
-    match o {
-        Operand::Immediate(v) => {
-            Ok((X86Operand::Immediate(*v), Vec::new()))
-        },
-        Operand::Temporary(x) => {
-            // Find register to store value in (if need to)
-            let (register, instrs) = regfind(st, rt, tt, &restrict);
-            // Find temporary in temporary table
-            let entry = tt.entry(*x).or_insert((None, None));
-            // See where stored
-            match entry {
-                // Not stored anywhere
-                (None, None) => {
-                    // Mark register in temporary table
-                    entry.0 = Some(register);
-                    // Mark register as storing this temporary value
-                    *rt.get_mut(register).unwrap() = vec![ RegisterValue::Temporary(*x) ];
-                    // Return
-                    return Ok((X86Operand::Register(register), instrs))
-                },
-                // Stored in a register
-                (Some(x), _) => {
-                    return Ok((X86Operand::Register(*x), Vec::new()))
-                }
-                // Stored in memory
-                (_, Some(_)) => panic!()
-            }
-        },
-        _ => todo!()
-    }
-}
-
 pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
@@ -538,16 +492,7 @@ pub fn bb_to_x86(bb: Vec<IRInstruction>, st: &mut SymbolTable) -> Result<Vec<X86
                 instrs.push(X86Instruction::Label(s))
             },
             IRInstruction::Mov(o1, o2) => {
-                // Find space for the first operand
-                let (ox1, instrs1) = operand_ir_to_x86(&o1, Vec::new(), st, &mut rt, &mut tt)?;
-                // Push instructions
-                for instr in instrs1 { instrs.push(instr) };
-                // Find space for the second operand
-                let (ox2, instrs2) = operand_ir_to_x86(&o2, Vec::new(), st, &mut rt, &mut tt)?;
-                // Push instructions
-                for instr in instrs2 { instrs.push(instr) };
-                // Generate move instruction
-                instrs.push(X86Instruction::Move(ox1, ox2))
+                
             },
             _ => ()
         }
