@@ -486,6 +486,54 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     }
 }
 
+pub fn st_push(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
+    // Accumulator
+    let mut acc: usize = 0;
+    // Mutable scope
+    let mut mscope = scope;
+    // Search through table
+    loop {
+        // Add everything from scope
+        for (_, x) in &mut st[mscope].1 {
+            // Add size to accumulator
+            acc += x.0.byte_size();
+            // Add byte offset
+            x.1 = acc + offset;
+            // Mark scope
+            x.2 = scope;
+        }
+        // Update scope
+        mscope = st[mscope].0;
+        // Exit if scope is already pushed
+        if mscope == 0 || st[mscope].0 > 0 { break; };
+    };
+    // Return number of bytes needed
+    acc
+}
+
+pub fn st_pop(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
+    // Accumulator
+    let mut acc: usize = 0;
+    // Mutable scope
+    let mut mscope = scope;
+    // Search through table
+    loop {
+        // Add everything from scope
+        for (_, x) in &mut st[mscope].1 {
+            // Add size to accumulator
+            acc += x.0.byte_size();
+            // Unmark scope
+            x.2 = 0;
+        }
+        // Update scope
+        mscope = st[mscope].0;
+        // Exit if scope is not what trying to pop
+        if mscope != scope { break; };
+    };
+    // Return number of bytes needed
+    acc
+}
+
 pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &RegisterTable) -> Vec<usize> {
     // Look through each register
     rt.iter().map(|r| {
@@ -640,7 +688,33 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             for instr in tinstrs { instrs.push(instr) }
                             // Return selected register
                             (X86Operand::Immediate(x), X86Operand::Register(selected_register))
-                        }
+                        },
+                        Operand::Variable(ident) => {
+                            // Check out which scope this variable is in
+                            let idx = st_lookup(&ident, &st, bb.1).unwrap();
+                            // Check location of variable
+                            match st[idx].1.get(&ident).unwrap().4 {
+                                // In a register
+                                (Some(r), _) => (X86Operand::Immediate(x), X86Operand::Register(r)),
+                                // In memory
+                                (_, Some(_)) => {
+                                    // Invalidate memory location of variable
+                                    st[idx].1.get_mut(&ident).unwrap().4.1 = None;
+                                    // Rank registers
+                                    let rankings = rank_registers(st, bb.1, &tt, &rt);
+                                    // Get register with smallest ranking
+                                    let selected_register = best_register(&rankings, Vec::new());
+                                    // Allocate selected register
+                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
+                                    // Update tables
+                                    rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
+                                    st[idx].1.get_mut(&ident).unwrap().4.0 = Some(selected_register);
+                                    // Return
+                                    (X86Operand::Immediate(x), X86Operand::Register(selected_register))
+                                },
+                                _ => panic!()
+                            }
+                        },
                         _ => panic!()
                     },
                     _ => panic!()
@@ -734,6 +808,22 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 };
                 // Push operation instruction
                 instrs.push(X86Instruction::Bop(op, ox1, ox2))
+            },
+            IRInstruction::PushScope(scope) => {
+                // Figure out space and update symbol table
+                let bytes = st_push(scope, st, *stackoffset);
+                // Update offset
+                *stackoffset += bytes;
+                // Subtract from stack pointer
+                instrs.push(X86Instruction::Bop(ArithOp::Sub, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+            },
+            IRInstruction::PopScope(scope) => {
+                // Figure out space and update symbol table
+                let bytes = st_pop(scope, st, *stackoffset);
+                // Update offset
+                *stackoffset -= bytes;
+                // Subtract from stack pointer
+                instrs.push(X86Instruction::Bop(ArithOp::Add, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
             },
             _ => ()
         }
