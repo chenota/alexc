@@ -522,8 +522,10 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
         for (_, x) in &mut st[mscope].1 {
             // Add size to accumulator
             acc += x.0.byte_size();
-            // Unmark scope
+            // Mark as deallocated
             x.2 = 0;
+            // Unmark scope
+            x.3 = false;
         }
         // Update scope
         mscope = st[mscope].0;
@@ -824,6 +826,10 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 *stackoffset -= bytes;
                 // Subtract from stack pointer
                 instrs.push(X86Instruction::Bop(ArithOp::Add, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+            },
+            IRInstruction::Declare(ident) => {
+                // Find variable in most recent scope and mark
+                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().3 = true;
             },
             _ => ()
         }
