@@ -814,18 +814,22 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             IRInstruction::PushScope(scope) => {
                 // Figure out space and update symbol table
                 let bytes = st_push(scope, st, *stackoffset);
-                // Update offset
-                *stackoffset += bytes;
-                // Subtract from stack pointer
-                instrs.push(X86Instruction::Bop(ArithOp::Sub, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+                if bytes > 0 {
+                    // Update offset
+                    *stackoffset += bytes;
+                    // Subtract from stack pointer
+                    instrs.push(X86Instruction::Bop(ArithOp::Sub, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+                }
             },
             IRInstruction::PopScope(scope) => {
                 // Figure out space and update symbol table
                 let bytes = st_pop(scope, st, *stackoffset);
-                // Update offset
-                *stackoffset -= bytes;
-                // Subtract from stack pointer
-                instrs.push(X86Instruction::Bop(ArithOp::Add, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+                if bytes > 0 {
+                    // Update offset
+                    *stackoffset -= bytes;
+                    // Subtract from stack pointer
+                    instrs.push(X86Instruction::Bop(ArithOp::Add, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
+                }
             },
             IRInstruction::Declare(ident) => {
                 // Find variable in most recent scope and mark
