@@ -472,7 +472,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
         // Exists, return current scope if is valid
-        Some((_, _, _, valid, _)) => if *valid {
+        Some((_, _, valid, _)) => if *valid {
             Some(scope)
         } else {
             st_lookup(ident, table, table[scope].0)
@@ -498,9 +498,9 @@ pub fn st_push(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
             // Add size to accumulator
             acc += x.0.byte_size();
             // Add byte offset
-            x.1 = acc + offset;
+            x.3.1 = Some(acc + offset);
             // Mark scope
-            x.2 = scope;
+            x.1 = scope;
         }
         // Update scope
         mscope = st[mscope].0;
@@ -523,9 +523,9 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
             // Add size to accumulator
             acc += x.0.byte_size();
             // Mark as deallocated
-            x.2 = 0;
+            x.1 = 0;
             // Unmark scope
-            x.3 = false;
+            x.2 = false;
         }
         // Update scope
         mscope = st[mscope].0;
@@ -550,7 +550,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
                     // Get scope of variable (should always be in scope)
                     let scope = st_lookup(ident, st, scope).unwrap();
                     // Figure out where value is stored
-                    match st[scope].1.get(ident).unwrap().4.1 {
+                    match st[scope].1.get(ident).unwrap().3.1 {
                         // In memory
                         Some(_) => score += 1,
                         // Not in memory
@@ -597,9 +597,9 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
                 // Get scope of variable (should always be in scope)
                 let scope = st_lookup(&ident, st, scope).unwrap();
                 // Invalidate register entry for variable
-                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
+                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
                 // Figure out where is stored
-                match st[scope].1.get(ident).unwrap().4.1 {
+                match st[scope].1.get(ident).unwrap().3.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory
@@ -695,13 +695,13 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             // Check out which scope this variable is in
                             let idx = st_lookup(&ident, &st, bb.1).unwrap();
                             // Check location of variable
-                            match st[idx].1.get(&ident).unwrap().4 {
+                            match st[idx].1.get(&ident).unwrap().3 {
                                 // In a register
                                 (Some(r), _) => (X86Operand::Immediate(x), X86Operand::Register(r)),
                                 // In memory
                                 (_, Some(_)) => {
                                     // Invalidate memory location of variable
-                                    st[idx].1.get_mut(&ident).unwrap().4.1 = None;
+                                    st[idx].1.get_mut(&ident).unwrap().3.1 = None;
                                     // Rank registers
                                     let rankings = rank_registers(st, bb.1, &tt, &rt);
                                     // Get register with smallest ranking
@@ -710,7 +710,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                     for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
                                     // Update tables
                                     rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
-                                    st[idx].1.get_mut(&ident).unwrap().4.0 = Some(selected_register);
+                                    st[idx].1.get_mut(&ident).unwrap().3.0 = Some(selected_register);
                                     // Return
                                     (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                                 },
@@ -833,7 +833,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             },
             IRInstruction::Declare(ident) => {
                 // Find variable in most recent scope and mark
-                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().3 = true;
+                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().2 = true;
             },
             _ => ()
         }
