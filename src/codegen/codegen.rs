@@ -482,7 +482,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
         // Exists, return current scope if is valid
-        Some((_, _, valid, _)) => if *valid {
+        Some((_, _, _, valid, _)) => if *valid {
             Some(scope)
         } else {
             st_lookup(ident, table, table[scope].0)
@@ -508,9 +508,11 @@ pub fn st_push(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
             // Add size to accumulator
             acc += x.0.byte_size();
             // Add byte offset
-            x.3.1 = Some(acc + offset);
+            x.2 = acc + offset;
             // Mark scope
             x.1 = scope;
+            // Remove memory locations
+            x.4 = (None, None)
         }
         // Update scope
         mscope = st[mscope].0;
@@ -535,7 +537,9 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usi
             // Mark as deallocated
             x.1 = 0;
             // Unmark scope
-            x.2 = false;
+            x.3 = false;
+            // Remove memory locations
+            x.4 = (None, None)
         }
         // Remove all register table references to variables in this scope
         for x in rt.iter_mut() {
@@ -564,7 +568,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
                     // Get scope of variable (should always be in scope)
                     let scope = st_lookup(ident, st, scope).unwrap();
                     // Figure out where value is stored
-                    match st[scope].1.get(ident).unwrap().3.1 {
+                    match st[scope].1.get(ident).unwrap().4.1 {
                         // In memory
                         Some(_) => score += 1,
                         // Not in memory
@@ -592,9 +596,8 @@ pub fn best_register(rankings: &Vec<usize>, restrict: Option<usize>) -> usize {
     // Iterate through rankings
     for (i, ranking) in rankings.iter().enumerate() {
         // Only consider unrestricted registers
-        if restrict.is_some_and(|r| r == i) || restrict.is_none() {
+        if restrict.is_none_or(|r| r != i) {
             // Update score
-            best_register_score = best_register_score.min(*ranking);
             if *ranking < best_register_score || best_register.is_none() {
                 best_register_score = *ranking;
                 best_register = Some(i)
@@ -616,15 +619,15 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
                 // Get scope of variable (should always be in scope)
                 let scope: usize = st_lookup(&ident, st, scope).unwrap();
                 // Invalidate register entry for variable
-                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
+                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
                 // Figure out where is stored
-                match st[scope].1.get(ident).unwrap().3.1 {
+                match st[scope].1.get(ident).unwrap().4.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory
                     None => {
-                        // Find location of variable in memory
-                        let mem_location = st[scope].1.get(ident).unwrap().1;
+                        // Find fixed location of variable in memory
+                        let mem_location = st[scope].1.get(ident).unwrap().2;
                         // Move to location
                         instrs.push(X86Instruction::Move(X86Operand::Register(register), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, mem_location)));
                     }
@@ -657,27 +660,23 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
 }
 
 fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Option<usize>) -> (usize, Vec<X86Instruction>) {
-    // Instructions
-    let mut instrs = Vec::new();
     // Get temporary table entry for this value
     let entry = tt.entry(temporary).or_insert((None, None)).clone();
     // Check where value exists
     match entry {
         // Already in a register
-        (Some(r), _) => (r, instrs),
+        (Some(r), _) => (r, Vec::new()),
         // Not in a register
         _ => {
-            // Invalidate memory value if exists
-            tt.get_mut(&temporary).unwrap().1 = None;
             // Rank registers
             let rankings = rank_registers(st, scope, &tt, &rt);
             // Get register with smallest ranking
             let selected_register = best_register(&rankings, restrict);
             // Allocate selected register
-            for instr in ralloc(selected_register, st, scope, tt, rt, stackoffset) { instrs.push(instr) };
+            let instrs =  ralloc(selected_register, st, scope, tt, rt, stackoffset);
             // Update tables
             rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(temporary));
-            tt.get_mut(&temporary).unwrap().0 = Some(selected_register);
+            *tt.get_mut(&temporary).unwrap() = (Some(selected_register), None);
             // Return selected register
             (selected_register, instrs)
         }
@@ -685,31 +684,26 @@ fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut Tempor
 }
 
 fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Option<usize>) -> (usize, Vec<X86Instruction>) {
-    // Instructions
-    let mut instrs = Vec::new();
     // Check out which scope this variable is in
     let idx = st_lookup(&ident, &st, scope).unwrap();
     // Check location of variable
-    match st[idx].1.get(ident).unwrap().3 {
+    match st[idx].1.get(ident).unwrap().4.0 {
         // In a register
-        (Some(r), _) => (r, instrs),
-        // In memory
-        (_, Some(_)) => {
-            // Invalidate memory location of variable
-            st[idx].1.get_mut(ident).unwrap().3.1 = None;
+        Some(r) => (r, Vec::new()),
+        // Not in a register
+        None => {
             // Rank registers
             let rankings = rank_registers(st, scope, &tt, &rt);
             // Get register with smallest ranking
             let selected_register = best_register(&rankings, restrict);
             // Allocate selected register
-            for instr in ralloc(selected_register, st, scope, tt, rt, stackoffset) { instrs.push(instr) };
+            let instrs = ralloc(selected_register, st, scope, tt, rt, stackoffset);
             // Update tables
             rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
-            st[idx].1.get_mut(ident).unwrap().3.0 = Some(selected_register);
+            st[idx].1.get_mut(ident).unwrap().4 = (Some(selected_register), None);
             // Return
             (selected_register, instrs)
-        },
-        _ => panic!()
+        }
     }
 }
 
@@ -757,7 +751,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                         // Figure out where the variable resides
                         let idx = st_lookup(&ident, st, bb.1).unwrap();
                         // Put o1 in a register
-                        let r1 = match st[idx].1.get(&ident).unwrap().3.0 {
+                        let r1 = match st[idx].1.get(&ident).unwrap().4.0 {
                             Some(r) => r,
                             None => {
                                 // Select a register
@@ -768,38 +762,61 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                 selected_register
                             }
                         };
-                        // Point o2 towards o1
+                        // Copy o1's value into o2
                         match o2 {
                             // Check location of other variable
                             Operand::Variable(ident2) => {
                                 // Figure out where the variable resides
                                 let idx2 = st_lookup(&ident2, st, bb.1).unwrap();
-                                // Clear register if variable lives there
-                                match st[idx2].1.get(&ident2).unwrap().3.0 {
-                                    Some(r2) => {
-                                        // Clear register r2
-                                        rt.get_mut(r2).unwrap().clear();
+                                // Check where o2 lives
+                                match st[idx2].1.get(&ident2).unwrap().4 {
+                                    // In register
+                                    (Some(r2), _) => {
+                                        // Invalidate memory location
+                                        st[idx2].1.get_mut(&ident2).unwrap().4.1 = None;
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Register(r2)))
                                     },
-                                    _ => ()
+                                    // In memory
+                                    (_, Some(x)) => {
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, x))) 
+                                    },
+                                    // Nowhere
+                                    _ => {
+                                        // Select a register
+                                        let (r2, tinstrs) = vselect(&ident2, st, bb.1, &mut tt, &mut rt, stackoffset, Some(r1));
+                                        // Push instrs
+                                        for instr in tinstrs { instrs.push(instr) }
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Register(r2)));
+                                    }
                                 };
-                                // Add ident2 to r1's values
-                                rt.get_mut(r1).unwrap().push(RegisterValue::Variable(ident2.clone()));
-                                // Add r1 to ident2's stored pair
-                                st[idx2].1.get_mut(&ident2).unwrap().3 = (Some(r1), None)
                             },
                             Operand::Temporary(x) => {
-                                // Clear register if temporary lives there
-                                match tt.entry(x).or_insert((None, None)).0 {
-                                    Some(r2) => {
-                                        // Clear register r2
-                                        rt.get_mut(r2).unwrap().clear();
+                                // Check where temporary value lives
+                                match tt.entry(x).or_insert((None, None)).clone() {
+                                    // In register
+                                    (Some(r2), _) => {
+                                        // Invalidate memory location
+                                        tt.get_mut(&x).unwrap().1 = None;
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Register(r2)))
+                                    }
+                                    (_, Some(y)) => {
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, y))) 
                                     },
-                                    _ => ()
+                                    // Nowhere
+                                    _ => {
+                                        // Select a register
+                                        let (r2, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, Some(r1));
+                                        // Push instrs
+                                        for instr in tinstrs { instrs.push(instr) }
+                                        // Push move instruction
+                                        instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Register(r2))) 
+                                    }
                                 };
-                                // Add x to r1's values
-                                rt.get_mut(r1).unwrap().push(RegisterValue::Temporary(x));
-                                // Add r1 to xs stored pair
-                                *tt.get_mut(&x).unwrap() = (Some(r1), None)
                             },
                             _ => panic!()
                         }
@@ -937,7 +954,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             },
             IRInstruction::Declare(ident) => {
                 // Find variable in most recent scope and mark
-                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().2 = true;
+                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().3 = true;
             },
             _ => ()
         }
