@@ -429,17 +429,17 @@ impl ToString for X86Operand {
         match self {
             X86Operand::Immediate(x) => "$".to_string() + &x.to_string(),
             X86Operand::Register(x) => match *x {
-                0 => "rax".to_string(),
-                1 => "rcx".to_string(),
-                2 => "rdx".to_string(),
-                3 => "rbx".to_string(),
-                4 => "rsi".to_string(),
-                5 => "rdi".to_string(),
-                _ => x.to_string()
+                0 => "%rax".to_string(),
+                1 => "%rcx".to_string(),
+                2 => "%rdx".to_string(),
+                3 => "%rbx".to_string(),
+                4 => "%rsi".to_string(),
+                5 => "%rdi".to_string(),
+                _ => "%".to_string() + &x.to_string()
             },
-            X86Operand::StackPointer => "rsp".to_string(),
-            X86Operand::BasePointer => "rbp".to_string(),
-            X86Operand::InstructionPointer => "rip".to_string(),
+            X86Operand::StackPointer => "%rsp".to_string(),
+            X86Operand::BasePointer => "%rbp".to_string(),
+            X86Operand::InstructionPointer => "%rip".to_string(),
             X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]"
         }
     }
@@ -448,6 +448,7 @@ impl ToString for X86Operand {
 #[derive(Clone)]
 pub enum X86Instruction {
     Global,
+    Syntax,
     Label(String),
     Move(X86Operand, X86Operand),
     Push(X86Operand),
@@ -459,10 +460,11 @@ impl ToString for X86Instruction {
     fn to_string(&self) -> String {
         match self {
             X86Instruction::Label(s) => s.clone() + ":",
-            X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + " " + &o2.to_string(),
-            X86Instruction::Global => "global _main".to_string(),
+            X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
+            X86Instruction::Syntax => ".att_syntax".to_string(),
+            X86Instruction::Global => ".global _main".to_string(),
             X86Instruction::Push(o1) => "push ".to_string() + &o1.to_string(),
-            X86Instruction::Bop(op, o1, o2) => op.to_string() + " " + &o1.to_string() + " " + &o2.to_string(),
+            X86Instruction::Bop(op, o1, o2) => op.to_string() + " " + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::Syscall => "syscall".to_string(),
             X86Instruction::Pop(o1) => "pop ".to_string() + &o1.to_string(),
         }
@@ -944,6 +946,7 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruct
     let mut st = st;
     // Empty instructions vector
     let mut instrs = vec![
+        X86Instruction::Syntax,
         X86Instruction::Global
     ];
     // Base stack pointer
