@@ -386,7 +386,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "main", Some(header), &ft)?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "start", Some(header), &ft)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
@@ -462,7 +462,7 @@ impl ToString for X86Instruction {
             X86Instruction::Label(s) => s.clone() + ":",
             X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::Syntax => ".att_syntax".to_string(),
-            X86Instruction::Global => ".global _main".to_string(),
+            X86Instruction::Global => ".global _start".to_string(),
             X86Instruction::Push(o1) => "push ".to_string() + &o1.to_string(),
             X86Instruction::Bop(op, o1, o2) => op.to_string() + " " + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::Syscall => "syscall".to_string(),
