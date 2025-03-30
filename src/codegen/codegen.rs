@@ -693,7 +693,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
             // Rank registers
             let rankings = rank_registers(st, scope, &tt, &rt);
             // Get register with smallest ranking
-            let selected_register = best_register(&rankings, Vec::new());
+            let selected_register = best_register(&rankings, restrict);
             // Allocate selected register
             for instr in ralloc(selected_register, st, scope, tt, rt, stackoffset) { instrs.push(instr) };
             // Update tables
@@ -865,6 +865,14 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                         X86Operand::Register(selected_register)
                     },
                     Operand::Immediate(x) => X86Operand::Immediate(x),
+                    Operand::Variable(ident) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
                     _ => panic!()
                 };
                 // Figure out second operand
@@ -877,6 +885,19 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                         };
                         // Select a temporary register
                         let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Variable(ident) => {
+                        // Restrict registers if need to
+                        let restrict = match ox1 {
+                            X86Operand::Register(x) => vec![x],
+                            _ => Vec::new()
+                        };
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
