@@ -595,7 +595,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
         match value {
             RegisterValue::Variable(ident) => {
                 // Get scope of variable (should always be in scope)
-                let scope = st_lookup(&ident, st, scope).unwrap();
+                let scope: usize = st_lookup(&ident, st, scope).unwrap();
                 // Invalidate register entry for variable
                 st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
                 // Figure out where is stored
