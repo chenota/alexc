@@ -242,6 +242,14 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().0.push(x)
                 };
+                // If operand is a variable, move to temporary
+                let operand = match &operand {
+                    Operand::Variable(_) => {
+                        instrs.last_mut().unwrap().0.push(IRInstruction::Move(operand, Operand::Temporary(0)));
+                        Operand::Temporary(0)
+                    },
+                    _ => operand
+                };
                 // Pop stack
                 instrs.last_mut().unwrap().0.push(IRInstruction::PopScope(bl.1));
                 fpop = false;
