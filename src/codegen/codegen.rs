@@ -472,7 +472,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
         // Exists, return current scope if is valid
-        Some((_, _, valid, _)) => if *valid {
+        Some((_, _, _, valid, _)) => if *valid {
             Some(scope)
         } else {
             st_lookup(ident, table, table[scope].0)
@@ -500,7 +500,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
                     // Get scope of variable (should always be in scope)
                     let scope = st_lookup(ident, st, scope).unwrap();
                     // Figure out where value is stored
-                    match st[scope].1.get(ident).unwrap().3.1 {
+                    match st[scope].1.get(ident).unwrap().4.1 {
                         // In memory
                         Some(_) => score += 1,
                         // Not in memory
@@ -547,9 +547,9 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
                 // Get scope of variable (should always be in scope)
                 let scope = st_lookup(&ident, st, scope).unwrap();
                 // Invalidate register entry for variable
-                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
+                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
                 // Figure out where is stored
-                match st[scope].1.get(ident).unwrap().3.1 {
+                match st[scope].1.get(ident).unwrap().4.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory
