@@ -444,7 +444,7 @@ pub enum X86Instruction {
     Move(X86Operand, X86Operand),
     Push(X86Operand),
     Pop(X86Operand),
-    Sub(X86Operand, X86Operand),
+    Bop(ArithOp, X86Operand, X86Operand),
     Syscall
 }
 impl ToString for X86Instruction {
@@ -454,7 +454,7 @@ impl ToString for X86Instruction {
             X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + " " + &o2.to_string(),
             X86Instruction::Global => "global _main".to_string(),
             X86Instruction::Push(o1) => "push ".to_string() + &o1.to_string(),
-            X86Instruction::Sub(o1, o2) => "sub ".to_string() + &o1.to_string() + " " + &o2.to_string(),
+            X86Instruction::Bop(op, o1, o2) => op.to_string() + " " + &o1.to_string() + " " + &o2.to_string(),
             X86Instruction::Syscall => "syscall".to_string(),
             X86Instruction::Pop(o1) => "pop ".to_string() + &o1.to_string(),
         }
@@ -587,6 +587,34 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     instrs
 }
 
+fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Vec<usize>) -> (usize, Vec<X86Instruction>) {
+    // Instructions
+    let mut instrs = Vec::new();
+    // Get temporary table entry for this value
+    let entry = tt.entry(temporary).or_insert((None, None)).clone();
+    // Check where value exists
+    match entry {
+        // Already in a register
+        (Some(r), _) => (r, instrs),
+        // Not in a register
+        _ => {
+            // Invalidate memory value if exists
+            tt.get_mut(&temporary).unwrap().1 = None;
+            // Rank registers
+            let rankings = rank_registers(st, scope, &tt, &rt);
+            // Get register with smallest ranking
+            let selected_register = best_register(&rankings, restrict);
+            // Allocate selected register
+            for instr in ralloc(selected_register, st, scope, tt, rt, stackoffset) { instrs.push(instr) };
+            // Update tables
+            rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(temporary));
+            tt.get_mut(&temporary).unwrap().0 = Some(selected_register);
+            // Return selected register
+            (selected_register, instrs)
+        }
+    }
+}
+
 pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
@@ -606,31 +634,12 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 let (ox1, ox2) = match o1 {
                     Operand::Immediate(x) => match o2 {
                         Operand::Temporary(y) => {
-                            // Get temporary table entry for this value
-                            let entry = tt.entry(y).or_insert((None, None)).clone();
-                            // Check where value exists
-                            match entry {
-                                // Already in a register
-                                (Some(r), _) => {
-                                    (X86Operand::Immediate(x), X86Operand::Register(r))
-                                },
-                                // Not in a register
-                                _ => {
-                                    // Invalidate memory value if exists
-                                    tt.get_mut(&y).unwrap().1 = None;
-                                    // Rank registers
-                                    let rankings = rank_registers(st, bb.1, &tt, &rt);
-                                    // Get register with smallest ranking
-                                    let selected_register = best_register(&rankings, Vec::new());
-                                    // Allocate selected register
-                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
-                                    // Update tables
-                                    rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(y));
-                                    tt.get_mut(&y).unwrap().0 = Some(selected_register);
-                                    // Return selected register
-                                    (X86Operand::Immediate(x), X86Operand::Register(selected_register))
-                                }
-                            }
+                            // Select a temporary register
+                            let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                            // Push instrs
+                            for instr in tinstrs { instrs.push(instr) }
+                            // Return selected register
+                            (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                         }
                         _ => panic!()
                     },
@@ -691,6 +700,40 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     },
                     _ => panic!()
                 }
+            },
+            IRInstruction::Arithmetic(op, op1, op2) => {
+                // Figure out first operand
+                let ox1 = match op1 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Immediate(x) => X86Operand::Immediate(x),
+                    _ => panic!()
+                };
+                // Figure out second operand
+                let ox2 = match op2 {
+                    Operand::Temporary(x) => {
+                        // Restrict registers if need to
+                        let restrict = match ox1 {
+                            X86Operand::Register(x) => vec![x],
+                            _ => Vec::new()
+                        };
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    _ => panic!()
+                };
+                // Push operation instruction
+                instrs.push(X86Instruction::Bop(op, ox1, ox2))
             },
             _ => ()
         }
