@@ -443,7 +443,9 @@ pub enum X86Instruction {
     Label(String),
     Move(X86Operand, X86Operand),
     Push(X86Operand),
-    Sub(X86Operand, X86Operand)
+    Pop(X86Operand),
+    Sub(X86Operand, X86Operand),
+    Syscall
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -452,7 +454,9 @@ impl ToString for X86Instruction {
             X86Instruction::Move(o1, o2) => "mov ".to_string() + &o1.to_string() + " " + &o2.to_string(),
             X86Instruction::Global => "global _main".to_string(),
             X86Instruction::Push(o1) => "push ".to_string() + &o1.to_string(),
-            X86Instruction::Sub(o1, o2) => "sub ".to_string() + &o1.to_string() + " " + &o2.to_string()
+            X86Instruction::Sub(o1, o2) => "sub ".to_string() + &o1.to_string() + " " + &o2.to_string(),
+            X86Instruction::Syscall => "syscall".to_string(),
+            X86Instruction::Pop(o1) => "pop ".to_string() + &o1.to_string(),
         }
     }
 }
@@ -620,6 +624,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                     let selected_register = best_register(&rankings, Vec::new());
                                     // Allocate selected register
                                     for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
+                                    // Update tables
+                                    rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(y));
+                                    tt.get_mut(&y).unwrap().0 = Some(selected_register);
                                     // Return selected register
                                     (X86Operand::Immediate(x), X86Operand::Register(selected_register))
                                 }
@@ -631,6 +638,59 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 };
                 // Generate move instruction
                 instrs.push(X86Instruction::Move(ox1, ox2))
+            },
+            IRInstruction::Exit(o1) => {
+                // rax is not empty
+                if rt[0].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(0, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                }
+                // Generate move instruction
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(60), X86Operand::Register(0)));
+                // Check out operand
+                match o1 {
+                    Operand::Temporary(x) => {
+                        // Get temporary table entry for this value
+                        let entry = tt.entry(x).or_insert((None, None)).clone();
+                        // Check where entry is
+                        match entry {
+                            // Already in a register
+                            (Some(r), _) => {
+                                // R is not already RDI
+                                if r != 5 {
+                                    // Clear RDI
+                                    for instr in ralloc(5, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                                    // Generate move instruction
+                                    instrs.push(X86Instruction::Move(X86Operand::Register(r), X86Operand::Register(5)));
+                                }
+                            },
+                            // In memory
+                            (_, Some(offset)) => {
+                                // Clear RDI
+                                for instr in ralloc(5, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                                // If is at top of stack
+                                if offset == *stackoffset {
+                                    // Generate pop instruction
+                                    instrs.push(X86Instruction::Pop(X86Operand::Register(5)));
+                                    // Clear memory
+                                    *stackoffset -= 8;
+                                    tt.get_mut(&x).unwrap().1 = None;
+                                } else {
+                                    // Generate move instruction
+                                    instrs.push(X86Instruction::Move(X86Operand::Memory(Box::new(X86Operand::BasePointer), true, offset), X86Operand::Register(5)))
+                                }
+                                // Update register and temporary tables
+                                rt.get_mut(5).unwrap().push(RegisterValue::Temporary(x));
+                                tt.get_mut(&x).unwrap().0 = Some(5);
+                            },
+                            // Not anywhere, panic
+                            _ => panic!()
+                        }
+                        // Syscall
+                        instrs.push(X86Instruction::Syscall);
+                    },
+                    _ => panic!()
+                }
             },
             _ => ()
         }
