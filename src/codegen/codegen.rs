@@ -674,6 +674,35 @@ fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut Tempor
     }
 }
 
+fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Vec<usize>) -> (usize, Vec<X86Instruction>) {
+    // Instructions
+    let mut instrs = Vec::new();
+    // Check out which scope this variable is in
+    let idx = st_lookup(&ident, &st, scope).unwrap();
+    // Check location of variable
+    match st[idx].1.get(ident).unwrap().3 {
+        // In a register
+        (Some(r), _) => (r, instrs),
+        // In memory
+        (_, Some(_)) => {
+            // Invalidate memory location of variable
+            st[idx].1.get_mut(ident).unwrap().3.1 = None;
+            // Rank registers
+            let rankings = rank_registers(st, scope, &tt, &rt);
+            // Get register with smallest ranking
+            let selected_register = best_register(&rankings, Vec::new());
+            // Allocate selected register
+            for instr in ralloc(selected_register, st, scope, tt, rt, stackoffset) { instrs.push(instr) };
+            // Update tables
+            rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
+            st[idx].1.get_mut(ident).unwrap().3.0 = Some(selected_register);
+            // Return
+            (selected_register, instrs)
+        },
+        _ => panic!()
+    }
+}
+
 pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
     // Generate register table for this basic block
     let mut rt: RegisterTable = Vec::new();
@@ -690,48 +719,83 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             },
             IRInstruction::Move(o1, o2) => {
                 // Generate operands for move
-                let (ox1, ox2) = match o1 {
-                    Operand::Immediate(x) => match o2 {
-                        Operand::Temporary(y) => {
-                            // Select a temporary register
-                            let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
-                            // Push instrs
-                            for instr in tinstrs { instrs.push(instr) }
-                            // Return selected register
-                            (X86Operand::Immediate(x), X86Operand::Register(selected_register))
-                        },
-                        Operand::Variable(ident) => {
-                            // Check out which scope this variable is in
-                            let idx = st_lookup(&ident, &st, bb.1).unwrap();
-                            // Check location of variable
-                            match st[idx].1.get(&ident).unwrap().3 {
-                                // In a register
-                                (Some(r), _) => (X86Operand::Immediate(x), X86Operand::Register(r)),
-                                // In memory
-                                (_, Some(_)) => {
-                                    // Invalidate memory location of variable
-                                    st[idx].1.get_mut(&ident).unwrap().3.1 = None;
-                                    // Rank registers
-                                    let rankings = rank_registers(st, bb.1, &tt, &rt);
-                                    // Get register with smallest ranking
-                                    let selected_register = best_register(&rankings, Vec::new());
-                                    // Allocate selected register
-                                    for instr in ralloc(selected_register, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) };
-                                    // Update tables
-                                    rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
-                                    st[idx].1.get_mut(&ident).unwrap().3.0 = Some(selected_register);
-                                    // Return
-                                    (X86Operand::Immediate(x), X86Operand::Register(selected_register))
-                                },
-                                _ => panic!()
+                match o1 {
+                    Operand::Immediate(x) => {
+                        let ox2 = match o2 {
+                            Operand::Temporary(y) => {
+                                // Select a temporary register
+                                let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                // Push instrs
+                                for instr in tinstrs { instrs.push(instr) }
+                                // Return selected register
+                                X86Operand::Register(selected_register)
+                            },
+                            Operand::Variable(ident) => {
+                                // Select a register
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                // Push instrs
+                                for instr in tinstrs { instrs.push(instr) }
+                                // Return selected register
+                                X86Operand::Register(selected_register)
+                            },
+                            _ => panic!()
+                        };
+                        // Generate move instruction
+                        instrs.push(X86Instruction::Move(X86Operand::Immediate(x), ox2))
+                    },
+                    Operand::Variable(ident) => {
+                        // Figure out where the variable resides
+                        let idx = st_lookup(&ident, st, bb.1).unwrap();
+                        // Put o1 in a register
+                        let r1 = match st[idx].1.get(&ident).unwrap().3.0 {
+                            Some(r) => r,
+                            None => {
+                                // Select a register
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                // Push instrs
+                                for instr in tinstrs { instrs.push(instr) }
+                                // Return selected register
+                                selected_register
                             }
-                        },
-                        _ => panic!()
+                        };
+                        // Point o2 towards o1
+                        match o2 {
+                            // Check location of other variable
+                            Operand::Variable(ident2) => {
+                                // Figure out where the variable resides
+                                let idx2 = st_lookup(&ident2, st, bb.1).unwrap();
+                                // Clear register if variable lives there
+                                match st[idx2].1.get(&ident2).unwrap().3.0 {
+                                    Some(r2) => {
+                                        // Clear register r2
+                                        rt.get_mut(r2).unwrap().clear();
+                                    },
+                                    _ => ()
+                                };
+                                // Add ident2 to r1's values
+                                rt.get_mut(r1).unwrap().push(RegisterValue::Variable(ident2.clone()));
+                                // Add r1 to ident2's stored pair
+                                st[idx2].1.get_mut(&ident2).unwrap().3 = (Some(r1), None)
+                            },
+                            Operand::Temporary(x) => {
+                                // Clear register if temporary lives there
+                                match tt.entry(x).or_insert((None, None)).0 {
+                                    Some(r2) => {
+                                        // Clear register r2
+                                        rt.get_mut(r2).unwrap().clear();
+                                    },
+                                    _ => ()
+                                };
+                                // Add x to r1's values
+                                rt.get_mut(r1).unwrap().push(RegisterValue::Temporary(x));
+                                // Add r1 to xs stored pair
+                                *tt.get_mut(&x).unwrap() = (Some(r1), None)
+                            },
+                            _ => panic!()
+                        }
                     },
                     _ => panic!()
                 };
-                // Generate move instruction
-                instrs.push(X86Instruction::Move(ox1, ox2))
             },
             IRInstruction::Exit(o1) => {
                 // rax is not empty
