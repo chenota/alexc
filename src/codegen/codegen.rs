@@ -79,7 +79,7 @@ impl ToString for IRInstruction {
             IRInstruction::Return => "return".to_string(),
             IRInstruction::Call(s) => "call _".to_string() + s,
             IRInstruction::PushScope(x) => "scope ".to_string() + &x.to_string(),
-            IRInstruction::PopScope(x) => "unscope ".to_string() + &x.to_string(),
+            IRInstruction::PopScope(x) => "descope ".to_string() + &x.to_string(),
             IRInstruction::JumpIfZero(op, s) => "jeqz ".to_string() + &op.to_string() + " " + s,
             IRInstruction::Jump(s) => "jump ".to_string() + s,
             IRInstruction::Declare(s) => "declare ".to_string() + s,
