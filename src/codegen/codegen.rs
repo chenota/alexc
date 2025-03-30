@@ -585,19 +585,24 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
     }).collect()
 }
 
-pub fn best_register(rankings: &Vec<usize>, restrict: Vec<usize>) -> usize {
+pub fn best_register(rankings: &Vec<usize>, restrict: Option<usize>) -> usize {
     // Store best register
-    let mut best_register_score: usize = std::usize::MAX;
+    let mut best_register_score: usize = 0;
+    let mut best_register = None;
     // Iterate through rankings
     for (i, ranking) in rankings.iter().enumerate() {
         // Only consider unrestricted registers
-        if !restrict.contains(&i) {
+        if restrict.is_some_and(|r| r == i) || restrict.is_none() {
             // Update score
             best_register_score = best_register_score.min(*ranking);
+            if *ranking < best_register_score || best_register.is_none() {
+                best_register_score = *ranking;
+                best_register = Some(i)
+            }
         }
     };
     // Return index of register with best score
-    rankings.iter().enumerate().position(|(i,r)| !restrict.contains(&i) && *r == best_register_score).unwrap()
+    best_register.unwrap()
 }
 
 pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
@@ -651,7 +656,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     instrs
 }
 
-fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Vec<usize>) -> (usize, Vec<X86Instruction>) {
+fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Option<usize>) -> (usize, Vec<X86Instruction>) {
     // Instructions
     let mut instrs = Vec::new();
     // Get temporary table entry for this value
@@ -679,7 +684,7 @@ fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut Tempor
     }
 }
 
-fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Vec<usize>) -> (usize, Vec<X86Instruction>) {
+fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize, restrict: Option<usize>) -> (usize, Vec<X86Instruction>) {
     // Instructions
     let mut instrs = Vec::new();
     // Check out which scope this variable is in
@@ -729,7 +734,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                         let ox2 = match o2 {
                             Operand::Temporary(y) => {
                                 // Select a temporary register
-                                let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -737,7 +742,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             },
                             Operand::Variable(ident) => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -756,7 +761,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             Some(r) => r,
                             None => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -860,7 +865,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 let ox1 = match op1 {
                     Operand::Temporary(x) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -869,7 +874,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     Operand::Immediate(x) => X86Operand::Immediate(x),
                     Operand::Variable(ident) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, Vec::new());
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -882,8 +887,8 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     Operand::Temporary(x) => {
                         // Restrict registers if need to
                         let restrict = match ox1 {
-                            X86Operand::Register(x) => vec![x],
-                            _ => Vec::new()
+                            X86Operand::Register(x) => Some(x),
+                            _ => None
                         };
                         // Select a temporary register
                         let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
@@ -895,8 +900,8 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     Operand::Variable(ident) => {
                         // Restrict registers if need to
                         let restrict = match ox1 {
-                            X86Operand::Register(x) => vec![x],
-                            _ => Vec::new()
+                            X86Operand::Register(x) => Some(x),
+                            _ => None
                         };
                         // Select a temporary register
                         let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
