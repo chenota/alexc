@@ -519,8 +519,7 @@ pub fn st_push(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
     acc
 }
 
-pub fn st_pop(scope: usize, st: &mut SymbolTable) -> usize {
-    println!("st_pop");
+pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usize {
     // Accumulator
     let mut acc: usize = 0;
     // Mutable scope
@@ -536,6 +535,10 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable) -> usize {
             // Unmark scope
             x.2 = false;
         }
+        // Remove all register table references to variables in this scope
+        for x in rt.iter_mut() {
+            x.retain(|r| match r { RegisterValue::Variable(ident) => st[mscope].1.get(ident).is_none(), _ => true })
+        };
         // Update scope
         mscope = st[mscope].0;
         // Exit if scope is not what trying to pop
@@ -896,7 +899,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             },
             IRInstruction::PopScope(scope) => {
                 // Figure out space and update symbol table
-                let bytes = st_pop(scope, st);
+                let bytes = st_pop(scope, st, &mut rt);
                 if bytes > 0 {
                     // Update offset
                     *stackoffset -= bytes;
