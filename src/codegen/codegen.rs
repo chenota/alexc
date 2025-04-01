@@ -472,7 +472,7 @@ impl ToString for X86Instruction {
 }
 #[derive(Clone)]
 pub enum RegisterValue {
-    Variable(String),
+    Variable(String, usize),
     Temporary(usize)
 }
 pub type RegisterTable = Vec<Vec<RegisterValue>>;
@@ -543,7 +543,9 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usi
         }
         // Remove all register table references to variables in this scope
         for x in rt.iter_mut() {
-            x.retain(|r| match r { RegisterValue::Variable(ident) => st[mscope].1.get(ident).is_none(), _ => true })
+            x.retain(|r| match r { 
+                RegisterValue::Variable(_, rscope) => *rscope != mscope, _ => true 
+            })
         };
         // Update scope
         mscope = st[mscope].0;
@@ -564,7 +566,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
             // Check out the value
             match value {
                 // Holding a variable value
-                RegisterValue::Variable(ident) => {
+                RegisterValue::Variable(ident, _) => {
                     // Get scope of variable (should always be in scope)
                     let scope = st_lookup(ident, st, scope).unwrap();
                     // Figure out where value is stored
@@ -615,19 +617,17 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
     for value in rt.get(register).unwrap() {
         // Check which kind of value
         match value {
-            RegisterValue::Variable(ident) => {
-                // Get scope of variable (should always be in scope)
-                let scope: usize = st_lookup(&ident, st, scope).unwrap();
+            RegisterValue::Variable(ident, rscope) => {
                 // Invalidate register entry for variable
-                st.get_mut(scope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
+                st.get_mut(*rscope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
                 // Figure out where is stored
-                match st[scope].1.get(ident).unwrap().4.1 {
+                match st[*rscope].1.get(ident).unwrap().4.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory
                     None => {
                         // Find fixed location of variable in memory
-                        let mem_location = st[scope].1.get(ident).unwrap().2;
+                        let mem_location = st[*rscope].1.get(ident).unwrap().2;
                         // Move to location
                         instrs.push(X86Instruction::Move(X86Operand::Register(register), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, mem_location)));
                     }
@@ -699,7 +699,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
             // Allocate selected register
             let instrs = ralloc(selected_register, st, scope, tt, rt, stackoffset);
             // Update tables
-            rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone()));
+            rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone(), scope));
             st[idx].1.get_mut(ident).unwrap().4 = (Some(selected_register), None);
             // Return
             (selected_register, instrs)
