@@ -10,8 +10,8 @@ AlexC is a compiled language that targets x86-64 assembly. A lot of people are s
 |-----------------------------|----------|
 | Token Generation            | ✅       |
 | Parsing                     | ✅       |
-| IR Code Generation          | 🚧       |
-| Assembly Code Generation    | ❌       |
+| IR Code Generation          | ✅       |
+| Assembly Code Generation    | 🚧       |
 
 ## Books
 
