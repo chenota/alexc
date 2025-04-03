@@ -486,7 +486,7 @@ impl ToString for X86Instruction {
 #[derive(Clone)]
 pub enum RegisterValue {
     Variable(String, usize),
-    Temporary(usize)
+    Temporary(usize, usize)
 }
 pub type RegisterTable = Vec<Vec<RegisterValue>>;
 pub type TemporaryTable = HashMap<usize, (Option<usize>, Option<usize>)>;
@@ -554,10 +554,10 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usi
             // Remove memory locations
             x.4 = (None, None)
         }
-        // Remove all register table references to variables in this scope
+        // Remove all register table references to variables and temporaries in this scope
         for x in rt.iter_mut() {
             x.retain(|r| match r { 
-                RegisterValue::Variable(_, rscope) => *rscope != mscope, _ => true 
+                RegisterValue::Variable(_, rscope) | RegisterValue::Temporary(_, rscope) => *rscope != mscope 
             })
         };
         // Update scope
@@ -591,7 +591,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
                     }
                 },
                 // Holding a temporary value
-                RegisterValue::Temporary(x) => match tt.get(x).unwrap().1 {
+                RegisterValue::Temporary(x, _) => match tt.get(x).unwrap().1 {
                     // In memory
                     Some(_) => score += 1,
                     // Not in memory
@@ -646,7 +646,7 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
                     }
                 }
             },
-            RegisterValue::Temporary(x) => {
+            RegisterValue::Temporary(x, _) => {
                 // Invalidate register entry for variable
                 tt.get_mut(x).unwrap().0 = None;
                 // Figure out where is stored
@@ -688,7 +688,7 @@ fn tselect(temporary: usize, st: &mut SymbolTable, scope: usize, tt: &mut Tempor
             // Allocate selected register
             let instrs =  ralloc(selected_register, st, scope, tt, rt, stackoffset);
             // Update tables
-            rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(temporary));
+            rt.get_mut(selected_register).unwrap().push(RegisterValue::Temporary(temporary, scope));
             *tt.get_mut(&temporary).unwrap() = (Some(selected_register), None);
             // Return selected register
             (selected_register, instrs)
@@ -875,7 +875,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                     instrs.push(X86Instruction::Move(X86Operand::Memory(Box::new(X86Operand::BasePointer), true, offset), X86Operand::Register(5)))
                                 }
                                 // Update register and temporary tables
-                                rt.get_mut(5).unwrap().push(RegisterValue::Temporary(x));
+                                rt.get_mut(5).unwrap().push(RegisterValue::Temporary(x, bb.1));
                                 tt.get_mut(&x).unwrap().0 = Some(5);
                             },
                             // Not anywhere, panic
