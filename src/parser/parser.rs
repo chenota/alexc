@@ -26,7 +26,8 @@ pub enum StatementBody {
     AssignStmt(Ident, Expression),
     IfStmt(Expression, Block, Option<Block>),
     WhileStmt(Expression, Block),
-    BlockStmt(Block)
+    BlockStmt(Block),
+    BreakStmt
 }
 
 pub type Statement = (StatementBody, Location);
@@ -332,6 +333,13 @@ impl Parser {
             let whilebody = match self.block(table, parent)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
             // Put together while statement
             return Ok(Some((StatementBody::WhileStmt(cond, whilebody), loc)))
+        }
+        // Check for break keyword
+        if self.expect(TokenType::BreakKw)?.is_some() {
+            // Expect semicolon
+            self.expect_err(TokenType::Semi)?;
+            // Return break statement
+            return Ok(Some((StatementBody::BreakStmt, loc)))
         }
         // Attempt to parse block
         match self.block(table, parent)? {

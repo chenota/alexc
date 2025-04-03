@@ -213,7 +213,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable) -> Result<Vec<BasicBlock>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable, loopcontext: Option<String>) -> Result<Vec<BasicBlock>, String> {
     // Unique label counter
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     // Instructions vector
@@ -285,7 +285,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::BlockStmt(bl2) => {
                 // Generate instructions for block
-                let mut newinstrs = basic_blocks(bl2, st, main, None, ft)?;
+                let newinstrs = basic_blocks(bl2, st, main, None, ft, loopcontext.clone())?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in newinstrs {
                     instrs.push(x)
@@ -305,7 +305,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Add branch instruction
                 instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
                 // Generate code for take condition
-                let mut tblocks = basic_blocks(b1, st, main, None, ft)?;
+                let tblocks = basic_blocks(b1, st, main, None, ft, loopcontext.clone())?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in tblocks {
                     instrs.push(x)
@@ -320,7 +320,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                         // Push fail label onto instrs
                         instrs.last_mut().unwrap().0.push(IRInstruction::Label(faillabel));
                         // Generate code blocks
-                        let mut fblocks = basic_blocks(b2, st, main, None, ft)?;
+                        let mut fblocks = basic_blocks(b2, st, main, None, ft, loopcontext.clone())?;
                         // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                         for x in fblocks.drain(0..1).next().unwrap().0 {
                             instrs.last_mut().unwrap().0.push(x)
@@ -353,7 +353,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Jump out of loop if condition is zero
                 instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, loopend.clone()));
                 // Generate code for loop body
-                let mut lblocks = basic_blocks(body, st, main, None, ft)?;
+                let lblocks = basic_blocks(body, st, main, None, ft, Some(loopend.clone()))?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in lblocks { instrs.push(x) };
                 // Jump back to loop start
@@ -362,6 +362,13 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 instrs.push((Vec::new(), bl.1));
                 // Add loopend label
                 instrs.last_mut().unwrap().0.push(IRInstruction::Label(loopend));
+            },
+            StatementBody::BreakStmt => {
+                // Jump to end of loop context if exists, otherwise error
+                match &loopcontext {
+                    Some(label) => instrs.last_mut().unwrap().0.push(IRInstruction::Jump(label.clone())),
+                    None => return Err("Error: Break outside of loop".to_string())
+                }
             }
         }
     };
@@ -386,7 +393,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "start", Some(header), &ft)?;
+        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "start", Some(header), &ft, None)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
