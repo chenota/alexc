@@ -720,10 +720,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
     }
 }
 
-pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
-    // Generate register table for this basic block
-    let mut rt: RegisterTable = Vec::new();
-    for _ in 0..14 { rt.push(Vec::new()) };
+pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
     // Generate temporary table for this basic block
     let mut tt: TemporaryTable = HashMap::new();
     // Empty instructions vector
@@ -741,7 +738,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                         let ox2 = match o2 {
                             Operand::Temporary(y) => {
                                 // Select a temporary register
-                                let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                                let (selected_register, tinstrs) = tselect(y, st, bb.1, &mut tt, rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -749,7 +746,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             },
                             Operand::Variable(ident) => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -768,7 +765,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             Some(r) => r,
                             None => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -798,7 +795,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                     // Nowhere
                                     _ => {
                                         // Select a register
-                                        let (r2, tinstrs) = vselect(&ident2, st, bb.1, &mut tt, &mut rt, stackoffset, Some(r1));
+                                        let (r2, tinstrs) = vselect(&ident2, st, bb.1, &mut tt, rt, stackoffset, Some(r1));
                                         // Push instrs
                                         for instr in tinstrs { instrs.push(instr) }
                                         // Push move instruction
@@ -823,7 +820,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                     // Nowhere
                                     _ => {
                                         // Select a register
-                                        let (r2, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, Some(r1));
+                                        let (r2, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, Some(r1));
                                         // Push instrs
                                         for instr in tinstrs { instrs.push(instr) }
                                         // Push move instruction
@@ -841,7 +838,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 // rax is not empty
                 if rt[0].len().clone() > 0 {
                     // Allocate register
-                    for instr in ralloc(0, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                    for instr in ralloc(0, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
                 }
                 // Generate move instruction
                 instrs.push(X86Instruction::Move(X86Operand::Immediate(60), X86Operand::Register(0)));
@@ -857,7 +854,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                                 // R is not already RDI
                                 if r != 5 {
                                     // Clear RDI
-                                    for instr in ralloc(5, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                                    for instr in ralloc(5, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
                                     // Generate move instruction
                                     instrs.push(X86Instruction::Move(X86Operand::Register(r), X86Operand::Register(5)));
                                 }
@@ -865,7 +862,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             // In memory
                             (_, Some(offset)) => {
                                 // Clear RDI
-                                for instr in ralloc(5, st, bb.1, &mut tt, &mut rt, stackoffset) { instrs.push(instr) }
+                                for instr in ralloc(5, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
                                 // If is at top of stack
                                 if offset == *stackoffset {
                                     // Generate pop instruction
@@ -895,7 +892,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 let ox1 = match op1 {
                     Operand::Temporary(x) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -904,7 +901,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     Operand::Immediate(x) => X86Operand::Immediate(x),
                     Operand::Variable(ident) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -921,7 +918,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             _ => None
                         };
                         // Select a temporary register
-                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, restrict);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -934,7 +931,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                             _ => None
                         };
                         // Select a temporary register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, restrict);
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, restrict);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -957,7 +954,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
             },
             IRInstruction::PopScope(scope) => {
                 // Figure out space and update symbol table
-                let bytes = st_pop(scope, st, &mut rt);
+                let bytes = st_pop(scope, st, rt);
                 if bytes > 0 {
                     // Update offset
                     *stackoffset -= bytes;
@@ -978,7 +975,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 let ox1 = match op1 {
                     Operand::Temporary(x) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return selected register
@@ -986,7 +983,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                     },
                     Operand::Variable(ident) => {
                         // Select a register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return selected register
@@ -1014,11 +1011,14 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruct
         X86Instruction::Syntax,
         X86Instruction::Global
     ];
+    // Empty register table
+    let mut rt: RegisterTable = Vec::new();
+    for _ in 0..14 { rt.push(Vec::new()) };
     // Base stack pointer
     let mut stackoffset: usize = 0;
     // Add instructions for each basic block
     for bb in ir {
-        for instr in bb_to_x86(bb, &mut st, &mut stackoffset)? {
+        for instr in bb_to_x86(bb, &mut st, &mut rt, &mut stackoffset)? {
             instrs.push(instr)
         }
     };
