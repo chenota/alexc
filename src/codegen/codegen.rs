@@ -454,7 +454,10 @@ pub enum X86Instruction {
     Push(X86Operand),
     Pop(X86Operand),
     Bop(ArithOp, X86Operand, X86Operand),
-    Syscall
+    Syscall,
+    Jump(String),
+    Compare(X86Operand, X86Operand),
+    JumpEqual(String)
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -467,6 +470,9 @@ impl ToString for X86Instruction {
             X86Instruction::Bop(op, o1, o2) => op.to_string() + " " + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::Syscall => "syscall".to_string(),
             X86Instruction::Pop(o1) => "pop ".to_string() + &o1.to_string(),
+            X86Instruction::Jump(x) => "jmp ".to_string() + x,
+            X86Instruction::Compare(o1, o2) => "cmp ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
+            X86Instruction::JumpEqual(x) => "je ".to_string() + x
         }
     }
 }
@@ -956,6 +962,36 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, stackoffset: &mut usize) 
                 // Find variable in most recent scope and mark
                 st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().3 = true;
             },
+            IRInstruction::Jump(label) => {
+                // Push jump instruction
+                instrs.push(X86Instruction::Jump(label))
+            },
+            IRInstruction::JumpIfZero(op1, label) => {
+                // Get operand
+                let ox1 = match op1 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return selected register
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Variable(ident) => {
+                        // Select a register
+                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, &mut rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return selected register
+                        X86Operand::Register(selected_register)
+                    },
+                    _ => panic!()
+                };
+                // Generate compare instruction
+                instrs.push(X86Instruction::Compare(ox1, X86Operand::Immediate(0)));
+                // Generate jump instruction
+                instrs.push(X86Instruction::JumpEqual(label));
+            }
             _ => ()
         }
     };
