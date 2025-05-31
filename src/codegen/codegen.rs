@@ -500,7 +500,7 @@ impl ToString for X86Operand {
             X86Operand::InstructionPointer => "%rip".to_string(),
             X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]",
             X86Operand::FixedMemory(s) => "[".to_string() + s + "]",
-            X86Operand::FixedAddress(s) => s.clone()
+            X86Operand::FixedAddress(s) => "$".to_string() + &s.clone()
         }
     }
 }

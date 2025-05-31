@@ -4,6 +4,7 @@ CC        = gcc
 
 # Build rule: make alexc binary if it doesn't already exist
 $(ALEXC):
+	@echo "[cargo] Building $(ALEXC)"
 	cargo build --release
 
 # Build rule: make <filename> builds <filename>.ac → .s → .out
