@@ -63,7 +63,7 @@ fn main() {
             Ok(ir) => ir,
             Err(s) => { eprintln!("{}", s); std::process::exit(1) }
         };
-        let x86 = match ir_to_x86(ir.0, ir.1) {
+        let x86 = match ir_to_x86(ir.0, ir.1, ir.2) {
             Ok(x86) => x86,
             Err(s) => { eprintln!("{}", s); std::process::exit(1) }
         };

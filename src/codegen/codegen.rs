@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize,Ordering};
 
 pub type FunctionTable = HashMap<String, (IdentList, usize)>;
+pub type DataTable = HashMap<String, usize>;
 pub type BasicBlock = (Vec<IRInstruction>, usize);
 
 #[derive(Clone)]
@@ -64,7 +65,9 @@ pub enum IRInstruction {
     PopScope(usize),
     JumpIfZero(Operand, String),
     Jump(String),
-    Declare(String)
+    Declare(String),
+    Printc(Operand),
+    Prints(String)
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
@@ -80,6 +83,8 @@ impl ToString for IRInstruction {
             IRInstruction::JumpIfZero(op, s) => "jeqz ".to_string() + &op.to_string() + " " + s,
             IRInstruction::Jump(s) => "jump ".to_string() + s,
             IRInstruction::Declare(s) => "declare ".to_string() + s,
+            IRInstruction::Printc(op1) => "printc ".to_string() + &op1.to_string(),
+            IRInstruction::Prints(s) => "prints ".to_string() + "'" + s + "'"
         }
     }
 }
@@ -214,7 +219,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
     }
 }
 
-pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable, loopcontext: Option<String>) -> Result<Vec<BasicBlock>, String> {
+pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: Option<Vec<IRInstruction>>, ft: &FunctionTable, loopcontext: Option<String>, dt: &mut DataTable) -> Result<Vec<BasicBlock>, String> {
     // Unique label counter
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     // Instructions vector
@@ -273,7 +278,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::BlockStmt(bl2) => {
                 // Generate instructions for block
-                let newinstrs = basic_blocks(bl2, st, main, None, ft, loopcontext.clone())?;
+                let newinstrs = basic_blocks(bl2, st, main, None, ft, loopcontext.clone(), dt)?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in newinstrs {
                     instrs.push(x)
@@ -293,7 +298,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Add branch instruction
                 instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, if b2.is_none() { endlabel.clone() } else { faillabel.clone() }));
                 // Generate code for take condition
-                let tblocks = basic_blocks(b1, st, main, None, ft, loopcontext.clone())?;
+                let tblocks = basic_blocks(b1, st, main, None, ft, loopcontext.clone(), dt)?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in tblocks {
                     instrs.push(x)
@@ -308,7 +313,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                         // Push fail label onto instrs
                         instrs.last_mut().unwrap().0.push(IRInstruction::Label(faillabel));
                         // Generate code blocks
-                        let mut fblocks = basic_blocks(b2, st, main, None, ft, loopcontext.clone())?;
+                        let mut fblocks = basic_blocks(b2, st, main, None, ft, loopcontext.clone(), dt)?;
                         // Push first generated basic block onto existing basic block (guaranteed to return at least one)
                         for x in fblocks.drain(0..1).next().unwrap().0 {
                             instrs.last_mut().unwrap().0.push(x)
@@ -341,7 +346,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Jump out of loop if condition is zero
                 instrs.last_mut().unwrap().0.push(IRInstruction::JumpIfZero(operand, loopend.clone()));
                 // Generate code for loop body
-                let lblocks = basic_blocks(body, st, main, None, ft, Some(loopend.clone()))?;
+                let lblocks = basic_blocks(body, st, main, None, ft, Some(loopend.clone()), dt)?;
                 // Push the rest of the basic blocks onto new vectors
                 for x in lblocks { instrs.push(x) };
                 // Jump back to loop start
@@ -357,6 +362,22 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     Some(label) => instrs.last_mut().unwrap().0.push(IRInstruction::Jump(label.clone())),
                     None => return Err("Error: Break outside of loop".to_string())
                 }
+            },
+            StatementBody::Emit(e1) => {
+                // Generate code or expression
+                let (e_instrs, _, operand) = expression_cg(&e1.0, 0, None, ft)?;
+                // Push code
+                for instr in e_instrs { instrs.last_mut().unwrap().0.push(instr) }
+                // Print instruction
+                instrs.last_mut().unwrap().0.push(IRInstruction::Printc(operand))
+            },
+            StatementBody::EmitString(s) => {
+                // Number of entries in data table
+                let dt_len = dt.len();
+                // Add string to data table
+                dt.entry(s.clone()).or_insert(dt_len);
+                // Print instruction
+                instrs.last_mut().unwrap().0.push(IRInstruction::Prints(s.clone()))
             }
         }
     };
@@ -366,9 +387,11 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
     Ok(instrs)
 }
 
-pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), String> {
+pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable, DataTable), String> {
     // Make prog mutable
     let (funs, mut st) = prog;
+    // Construct empty data table
+    let mut dt = DataTable::new();
     // Construct function table from program
     let mut ft = FunctionTable::new();
     for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), st[fun.1.1.1].0)); };
@@ -381,12 +404,12 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.1, &mut st, fun.0 == "start", Some(header), &ft, None)?;
+        let mut fun_blocks = basic_blocks(&fun.1.1, &mut st, fun.0 == "start", Some(header), &ft, None, &mut dt)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
     // Return
-    Ok((blocks, st))
+    Ok((blocks, st, dt))
 }
 
 pub fn ir_to_file(ir: Vec<BasicBlock>, path: String) -> Result<(), String> {
@@ -417,7 +440,9 @@ pub enum X86Operand {
     StackPointer,
     BasePointer,
     InstructionPointer,
-    Memory(Box<X86Operand>, bool, usize)
+    Memory(Box<X86Operand>, bool, usize),
+    FixedMemory(String),
+    FixedAddress(String)
 }
 impl ToString for X86Operand {
     fn to_string(&self) -> String {
@@ -435,7 +460,9 @@ impl ToString for X86Operand {
             X86Operand::StackPointer => "%rsp".to_string(),
             X86Operand::BasePointer => "%rbp".to_string(),
             X86Operand::InstructionPointer => "%rip".to_string(),
-            X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]"
+            X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]",
+            X86Operand::FixedMemory(s) => "[".to_string() + s + "]",
+            X86Operand::FixedAddress(s) => s.clone()
         }
     }
 }
@@ -712,7 +739,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
     }
 }
 
-pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Result<Vec<X86Instruction>, String> {
+pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, stackoffset: &mut usize, dt: &DataTable) -> Result<Vec<X86Instruction>, String> {
     // Generate temporary table for this basic block
     let mut tt: TemporaryTable = HashMap::new();
     // Empty instructions vector
@@ -1015,6 +1042,93 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
             },
             IRInstruction::Return => {
                 instrs.push(X86Instruction::Return)
+            },
+            IRInstruction::Printc(op1) => {
+                // Get operand
+                let ox1 = match op1 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return selected register
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Variable(ident, advance) => {
+                        // Select a register
+                        let (selected_register, tinstrs) = vselect(&ident, st, advance.unwrap_or(bb.1), &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return selected register
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Return => X86Operand::Register(0),
+                    _ => panic!()
+                };
+                // Move ox1 into memory
+                instrs.push(X86Instruction::Move(ox1, X86Operand::FixedMemory("__char".to_string())));
+                // Clear RAX
+                if rt[0].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(0, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move 1 into RAX
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(1), X86Operand::Register(0)));
+                // Clear RDI
+                if rt[5].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(5, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move 1 into RDI
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(1), X86Operand::Register(5)));
+                // Clear RSI
+                if rt[4].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(4, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move __char memory into RSI
+                instrs.push(X86Instruction::Move(X86Operand::FixedAddress("__char".to_string()), X86Operand::Register(4)));
+                // Clear RDX
+                if rt[2].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(2, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move 1 into RDX
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(1), X86Operand::Register(2)));
+                // Syscall
+                instrs.push(X86Instruction::Syscall)
+            },
+            IRInstruction::Prints(s) => {
+                // Clear RAX
+                if rt[0].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(0, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move 1 into RAX
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(1), X86Operand::Register(0)));
+                // Clear RDI
+                if rt[5].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(5, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move 1 into RDI
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(1), X86Operand::Register(5)));
+                // Clear RSI
+                if rt[4].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(4, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move string memory into RSI
+                instrs.push(X86Instruction::Move(X86Operand::FixedAddress("__data".to_string() + &dt.get(&s).unwrap().to_string()), X86Operand::Register(4)));
+                // Clear RDX
+                if rt[2].len().clone() > 0 {
+                    // Allocate register
+                    for instr in ralloc(2, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
+                }
+                // Move string length into RDX
+                instrs.push(X86Instruction::Move(X86Operand::Immediate(s.len() as i32), X86Operand::Register(2)));
+                // Syscall
+                instrs.push(X86Instruction::Syscall)
             }
         }
     };
@@ -1022,7 +1136,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
     Ok(instrs)
 }
 
-pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruction>, String> {
+pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable, dt: DataTable) -> Result<Vec<X86Instruction>, String> {
     // Make symbol table mutable
     let mut st = st;
     // Empty instructions vector
@@ -1037,7 +1151,7 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable) -> Result<Vec<X86Instruct
     let mut stackoffset: usize = 0;
     // Add instructions for each basic block
     for bb in ir {
-        for instr in bb_to_x86(bb, &mut st, &mut rt, &mut stackoffset)? {
+        for instr in bb_to_x86(bb, &mut st, &mut rt, &mut stackoffset, &dt)? {
             instrs.push(instr)
         }
     };
