@@ -89,7 +89,7 @@ pub enum IRInstruction {
     PopScope(usize),
     JumpIfZero(Operand, String),
     Jump(String),
-    Declare(String),
+    Declare(String, Option<usize>), // Declare in non-default scope option
     Printc(Operand),
     Prints(String),
     SetBasePointer,
@@ -107,7 +107,7 @@ impl ToString for IRInstruction {
             IRInstruction::PopScope(x) => "descope ".to_string() + &x.to_string(),
             IRInstruction::JumpIfZero(op, s) => "jeqz ".to_string() + &op.to_string() + " " + s,
             IRInstruction::Jump(s) => "jump ".to_string() + s,
-            IRInstruction::Declare(s) => "declare ".to_string() + s,
+            IRInstruction::Declare(s, opt) => "declare ".to_string() + s + &(match opt { Some(s) => "::".to_string() + &s.to_string(), _ => "".to_string() }),
             IRInstruction::Printc(op1) => "printc ".to_string() + &op1.to_string(),
             IRInstruction::Prints(s) => "prints ".to_string() + "'" + s + "'",
             IRInstruction::Comparison(op, op1, op2, op3) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string() + " " + &op3.to_string(),
@@ -233,7 +233,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     }
                 };
                 // Declare variable
-                instrs.push(IRInstruction::Declare(pname.clone()));
+                instrs.push(IRInstruction::Declare(pname.clone(), Some(finfo.1)));
                 // Move result into variable
                 instrs.push(IRInstruction::Move(operand, Operand::Variable(pname.clone(), Some(finfo.1))))
             };
@@ -306,7 +306,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::LetStmt(id, e) => {
                 // Generate declare instruction
-                instrs.last_mut().unwrap().0.push(IRInstruction::Declare(id.clone()));
+                instrs.last_mut().unwrap().0.push(IRInstruction::Declare(id.clone(), None));
                 // Generate instructions for expressions
                 let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone(), None)), ft)?;
                 for x in code.drain(..) {
@@ -1156,9 +1156,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                     instrs.push(X86Instruction::Bop(ArithOp::Add, X86Operand::Immediate(bytes as i32), X86Operand::StackPointer));
                 }
             },
-            IRInstruction::Declare(ident) => {
+            IRInstruction::Declare(ident, scope_override) => {
                 // Find variable in most recent scope and mark
-                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().2 = true;
+                st.get_mut(match scope_override { Some(s) => s, _ => bb.1 }).unwrap().1.get_mut(&ident).unwrap().2 = true;
             },
             IRInstruction::Jump(label) => {
                 // Push jump instruction
