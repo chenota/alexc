@@ -371,7 +371,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
     let (funs, mut st) = prog;
     // Construct function table from program
     let mut ft = FunctionTable::new();
-    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), st[fun.1.2.1].0)); };
+    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), st[fun.1.1.1].0)); };
     // Blocks vector
     let mut blocks = Vec::new();
     // Loop through functions in the program
