@@ -457,7 +457,9 @@ pub enum X86Instruction {
     Syscall,
     Jump(String),
     Compare(X86Operand, X86Operand),
-    JumpEqual(String)
+    JumpEqual(String),
+    Call(String),
+    Return
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -472,7 +474,9 @@ impl ToString for X86Instruction {
             X86Instruction::Pop(o1) => "pop ".to_string() + &o1.to_string(),
             X86Instruction::Jump(x) => "jmp ".to_string() + x,
             X86Instruction::Compare(o1, o2) => "cmp ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
-            X86Instruction::JumpEqual(x) => "je ".to_string() + x
+            X86Instruction::JumpEqual(x) => "je ".to_string() + x,
+            X86Instruction::Call(label) => "call ".to_string() + label,
+            X86Instruction::Return => "ret".to_string()
         }
     }
 }
@@ -1016,6 +1020,12 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                 instrs.push(X86Instruction::Compare(ox1, X86Operand::Immediate(0)));
                 // Generate jump instruction
                 instrs.push(X86Instruction::JumpEqual(label));
+            },
+            IRInstruction::Call(fname) => {
+                instrs.push(X86Instruction::Call(fname));
+            },
+            IRInstruction::Return => {
+                instrs.push(X86Instruction::Return)
             }
             _ => ()
         }
