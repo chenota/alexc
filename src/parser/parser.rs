@@ -171,6 +171,13 @@ impl Parser {
             // Didn't match, return
             break
         }
+        println!("Symbol Table:");
+        for (idx, entry) in table.iter().enumerate() {
+            println!("  Entry {} (parent {}):", idx, entry.0);
+            for (vname, _) in &entry.1 {
+                println!("    {}", vname)
+            }
+        }
         // Return program
         Ok((fns, table))
     }
