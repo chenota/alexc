@@ -324,8 +324,10 @@ impl Parser {
         // Check for emit keyword
         if self.expect(TokenType::EmitKw)?.is_some() {
             // Check for string literal
-            match self.expect(TokenType::StringLiteral)? {
+            match self.expect(TokenType::StringLiteral)?.cloned() {
                 Some((_, TokenValue::String(literal), _)) => {
+                    // Expect semicolon
+                    self.expect_err(TokenType::Semi)?;
                     // Return emit statement
                     return Ok(Some((StatementBody::EmitString(literal.clone()), loc)))
                 },

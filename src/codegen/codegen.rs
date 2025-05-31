@@ -770,7 +770,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
                                 X86Operand::Register(selected_register)
-                            },
+                            }
                             _ => panic!()
                         };
                         // Generate move instruction
