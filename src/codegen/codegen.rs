@@ -629,11 +629,6 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
         match value {
             RegisterValue::Variable(ident, rscope) => {
                 // Invalidate register entry for variable
-                println!("Looking for identifier {} in scope {}", *ident, *rscope);
-                println!("Available Variables:");
-                for v in &st.get(*rscope).unwrap().1 {
-                    println!("{}", v.0)
-                }
                 st.get_mut(*rscope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
                 // Figure out where is stored
                 match st[*rscope].1.get(ident).unwrap().4.1 {
@@ -760,7 +755,6 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         instrs.push(X86Instruction::Move(X86Operand::Immediate(x), ox2))
                     },
                     Operand::Variable(ident, advance) => {
-                        println!("Lookup {} in scope {}", ident, advance.unwrap_or(bb.1));
                         // Figure out where the variable resides
                         let idx = st_lookup(&ident, st, advance.unwrap_or(bb.1)).unwrap();
                         // Put o1 in a register
