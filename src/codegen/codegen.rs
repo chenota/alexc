@@ -542,10 +542,10 @@ impl ToString for X86Instruction {
             X86Instruction::JumpEqual(x) => "je ".to_string() + x,
             X86Instruction::Call(label) => "call ".to_string() + label,
             X86Instruction::Return => "ret".to_string(),
-            X86Instruction::SectionText => "section .text".to_string(),
-            X86Instruction::SectionData => "section .data".to_string(),
-            X86Instruction::CharData => "__char db 0".to_string(),
-            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + " db \"" + s + "\"",
+            X86Instruction::SectionText => ".text".to_string(),
+            X86Instruction::SectionData => ".data".to_string(),
+            X86Instruction::CharData => "__char:\n.byte 0".to_string(),
+            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + ":\n .ascii \"" + s + "\"",
             X86Instruction::SetCmp(op, o1) => op.to_string() + " " + &o1.to_string(),
         }
     }
