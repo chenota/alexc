@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub type Program = (HashMap<Ident, Function>, SymbolTable);
 pub type Function = (IdentList, Block, Location);
-pub type SymbolTable = Vec<(usize, HashMap<String, (usize, usize, bool, (Option<usize>, Option<usize>), )>)>; // Pushed with, fixed memory location, has been declared in this scope, location(s) stored at
+pub type SymbolTable = Vec<(usize, HashMap<String, (usize, usize, bool, (Option<usize>, Option<usize>))>, usize)>; // Pushed with, fixed memory location, has been declared in this scope, location(s) stored at, additional space used during runtime
 pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
@@ -157,7 +157,7 @@ impl Parser {
         // Vectors to hold parts of the program
         let mut fns = HashMap::new();
         // Create symbol table with one entry (global scope)
-        let mut table: SymbolTable = vec![ (0, HashMap::new()) ];
+        let mut table: SymbolTable = vec![ (0, HashMap::new(), 0) ];
         // Capture functions until can't anymore
         loop {
             // Check if function
@@ -181,7 +181,7 @@ impl Parser {
             _ => ()
         };
         // Create new node in the symbol table (point back to parent)
-        table.push((parent, HashMap::new()));
+        table.push((parent, HashMap::new(), 0));
         // Get new scope id
         let scope_id = table.len() - 1;
         // Parse statement list
@@ -223,7 +223,7 @@ impl Parser {
                 Some(_) => return Err(self.generic_err("Duplicate function parameters"))
             }
         };
-        table.push((0, vars));
+        table.push((0, vars, 0));
         // Expect block (parent is function parameter scope)
         let b = match self.block(table, table.len() - 1)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
         // Return

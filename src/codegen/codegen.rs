@@ -610,6 +610,10 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usi
     let mut mscope = scope;
     // Search through table
     loop {
+        // Add additional space in scope
+        acc += st[mscope].2;
+        // Clear additional space for entry
+        st[mscope].2 = 0;
         // Add everything from scope
         for (_, x) in &mut st[mscope].1 {
             // Add size to accumulator
@@ -690,7 +694,7 @@ pub fn best_register(rankings: &Vec<usize>, restrict: Option<usize>) -> usize {
     best_register.unwrap()
 }
 
-pub fn ralloc(register: usize, st: &mut SymbolTable, _: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
+pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
     // Instructions needed to perform allocation
     let mut instrs = Vec::new();
     // Check which values this register stores
@@ -724,6 +728,8 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, _: usize, tt: &mut Temporar
                     None => {
                         // Update stack size
                         *stackoffset += 8;
+                        // Update symbol table
+                        st[scope].2 += 8;
                         // Update memory location
                         tt.get_mut(x).unwrap().1 = Some(*stackoffset);
                         // Push register to stack
@@ -946,6 +952,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                     instrs.push(X86Instruction::Pop(X86Operand::Register(5)));
                                     // Clear memory
                                     *stackoffset -= 8;
+                                    st[bb.1].2 -= 8;
                                     tt.get_mut(&x).unwrap().1 = None;
                                 } else {
                                     // Generate move instruction
