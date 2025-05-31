@@ -14,7 +14,9 @@ pub enum StatementBody {
     IfStmt(Expression, Block, Option<Block>),
     WhileStmt(Expression, Block),
     BlockStmt(Block),
-    BreakStmt
+    BreakStmt,
+    EmitString(String),
+    Emit(Expression)
 }
 
 pub type Statement = (StatementBody, Location);
@@ -318,6 +320,28 @@ impl Parser {
             self.expect_err(TokenType::Semi)?;
             // Return break statement
             return Ok(Some((StatementBody::BreakStmt, loc)))
+        }
+        // Check for emit keyword
+        if self.expect(TokenType::EmitKw)?.is_some() {
+            // Check for string literal
+            match self.expect(TokenType::StringLiteral)? {
+                Some((_, TokenValue::String(literal), _)) => {
+                    // Return emit statement
+                    return Ok(Some((StatementBody::EmitString(literal.clone()), loc)))
+                },
+                None => {
+                    // Parse expression
+                    let e1 = match self.expression()? {
+                        Some(e) => e,
+                        None => return Err(self.expected_err("Expression"))
+                    };
+                    // Expect semicolon
+                    self.expect_err(TokenType::Semi)?;
+                    // Return emit statement
+                    return Ok(Some((StatementBody::Emit(e1), loc)))
+                },
+                _ => panic!()
+            }
         }
         // Attempt to parse block
         match self.block(table, parent)? {
