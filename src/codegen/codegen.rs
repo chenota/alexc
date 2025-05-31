@@ -91,7 +91,8 @@ pub enum IRInstruction {
     Jump(String),
     Declare(String),
     Printc(Operand),
-    Prints(String)
+    Prints(String),
+    SetBasePointer,
 }
 impl ToString for IRInstruction {
     fn to_string(&self) -> String {
@@ -110,6 +111,7 @@ impl ToString for IRInstruction {
             IRInstruction::Printc(op1) => "printc ".to_string() + &op1.to_string(),
             IRInstruction::Prints(s) => "prints ".to_string() + "'" + s + "'",
             IRInstruction::Comparison(op, op1, op2, op3) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string() + " " + &op3.to_string(),
+            IRInstruction::SetBasePointer => "sbp".to_string()
         }
     }
 }
@@ -267,7 +269,11 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         Some(v) => v,
         _ => Vec::new()
     }, bl.1));
-    // Immediately push stack only if main function
+    // If main, add base pointer instruction
+    if main {
+        instrs.last_mut().unwrap().0.push(IRInstruction::SetBasePointer);
+    }
+    // Immediately push stack
     instrs.last_mut().unwrap().0.push(IRInstruction::PushScope(bl.1));
     // Flag to pop stack at very end of block
     let mut fpop: bool = true;
@@ -819,6 +825,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
     // Iterate through each IR instruction in the basic block
     for instr in bb.0 {
         match instr {
+            IRInstruction::SetBasePointer => {
+                instrs.push(X86Instruction::Move(X86Operand::StackPointer, X86Operand::BasePointer))
+            }
             IRInstruction::Label(s) => {
                 instrs.push(X86Instruction::Label(s))
             },
