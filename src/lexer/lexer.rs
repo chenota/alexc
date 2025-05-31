@@ -27,16 +27,16 @@ pub enum TokenType {
     LetKw,
     FunKw,
     ReturnKw,
-    Colon,
     Comma,
     Whitespace,
     Newline,
-    Arrow,
     IfKw,
     ElseKw,
     WhileKw,
     EOF,
-    BreakKw
+    BreakKw,
+    EmitKw,
+    StringLiteral
 }
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -66,9 +66,10 @@ fn gen_none(_: &str) -> Option<TokenValue> { None }
 fn gen_empty(_: &str) -> Option<TokenValue> { Some(TokenValue::Empty) }
 fn gen_int(x: &str) -> Option<TokenValue> { Some(TokenValue::Integer(x.parse().unwrap())) }
 fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string())) }
+fn gen_str(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x[1..x.len() - 1].to_string())) }
 
 // Constant tokens list
-const TOKENS: [(&str, TokenType, ValueGenerator); 22] = tlist!(
+const TOKENS: [(&str, TokenType, ValueGenerator); 24] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
     r"fun", TokenType::FunKw, gen_empty;
     r"return", TokenType::ReturnKw, gen_empty;
@@ -76,6 +77,7 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 22] = tlist!(
     r"else", TokenType::ElseKw, gen_empty;
     r"while", TokenType::WhileKw, gen_empty;
     r"break", TokenType::BreakKw, gen_empty;
+    r"emit", TokenType::EmitKw, gen_empty;
     r"\+", TokenType::Plus, gen_empty;
     r"-", TokenType::Minus, gen_empty;
     r"\*", TokenType::Times, gen_empty;
@@ -89,6 +91,7 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 22] = tlist!(
     r",", TokenType::Comma, gen_empty;
     r"[0-9]+", TokenType::Integer, gen_int;
     r"[a-zA-Z][a-zA-Z0-9]*", TokenType::Identifier, gen_id;
+    r"'[^']*'", TokenType::StringLiteral, gen_str;
     r"[\t\v\f\r ]", TokenType::Whitespace, gen_none;
     r"\n", TokenType::Newline, gen_none
 );
