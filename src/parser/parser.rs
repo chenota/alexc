@@ -1,28 +1,15 @@
 use crate::lexer::lexer::*;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Type {
-    Int,
-    Float
-}
-impl Type {
-    pub fn byte_size(&self) -> usize {
-        match self {
-            Type::Int | Type::Float => 8
-        }
-    }
-}
-
 pub type Program = (HashMap<Ident, Function>, SymbolTable);
-pub type Function = (ForceTypedIdentList, Type, Block, Location);
-pub type SymbolTable = Vec<(usize, HashMap<String, (Type, usize, usize, bool, (Option<usize>, Option<usize>), )>)>; // Type, pushed with, fixed memory location, has been declared in this scope, location(s) stored at
+pub type Function = (IdentList, Block, Location);
+pub type SymbolTable = Vec<(usize, HashMap<String, (usize, usize, bool, (Option<usize>, Option<usize>), )>)>; // Pushed with, fixed memory location, has been declared in this scope, location(s) stored at
 pub type Block = (Vec<Statement>, usize);
 
 pub enum StatementBody {
     ExprStatement(Expression),
     ReturnStatement(Expression),
-    LetStmt(TypedIdent, Expression),
+    LetStmt(Ident, Expression),
     AssignStmt(Ident, Expression),
     IfStmt(Expression, Block, Option<Block>),
     WhileStmt(Expression, Block),
@@ -57,12 +44,8 @@ pub enum Bop {
 }
 
 pub type Ident = String;
-pub type TypedIdent = (String, Option<Type>);
-pub type ForceTypedIdent = (String, Type);
 
 pub type IdentList = Vec<Ident>;
-pub type TypedIdentList = Vec<TypedIdent>;
-pub type ForceTypedIdentList = Vec<ForceTypedIdent>;
 pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
 
@@ -206,7 +189,7 @@ impl Parser {
         let idlist = 
             if self.expect(TokenType::LParen)?.is_some() {
                 // Parse identifier list
-                let idlist = self.force_typed_identlist()?;
+                let idlist = self.identlist()?;
                 // Expect closing paren
                 self.expect_err(TokenType::RParen)?;
                 // Return ilist
@@ -215,14 +198,10 @@ impl Parser {
                 // Empty list
                 Vec::new()
             };
-        // Expect Arrow
-        self.expect_err(TokenType::Arrow)?;
-        // Expect ident
-        let ret_type = self.parse_type()?;
         // Create symbol table entry just for function parameters (this allows for redefining in body)
         let mut vars = HashMap::new();
-        for (id, typ) in &idlist {
-            match vars.insert(id.clone(), (typ.clone(), 0, 0, true, (None, None))) {
+        for id in &idlist {
+            match vars.insert(id.clone(), (0, 0, true, (None, None))) {
                 None => (),
                 Some(_) => return Err(self.generic_err("Duplicate function parameters"))
             }
@@ -231,7 +210,7 @@ impl Parser {
         // Expect block (parent is function parameter scope)
         let b = match self.block(table, table.len() - 1)? { Some(b) => b, _ => return Err(self.expected_err("Block")) };
         // Return
-        Ok(Some((id, (idlist, ret_type, b, loc))))
+        Ok(Some((id, (idlist, b, loc))))
     }
     fn statement(&mut self, table: &mut SymbolTable, parent: usize) -> Result<Option<Statement>, String> {
         // Mark position
@@ -266,9 +245,9 @@ impl Parser {
         // Check for let token
         if self.expect(TokenType::LetKw)?.is_some() {
             // Parse a typed identifier
-            let tid = match self.typed_ident()? {
-                Some(x) => x,
-                None => return Err(self.expected_err("typed identifier"))
+            let tid = match self.expect_err(TokenType::Identifier)? {
+                (_, TokenValue::String(x), _) => x.clone(),
+                _ => panic!()
             };
             // Expect an equal sign
             self.expect_err(TokenType::Equal)?;
@@ -280,8 +259,7 @@ impl Parser {
             // Expect a semicolon
             self.expect_err(TokenType::Semi)?;
             // Create a new symbol table entry for parent scope
-            // TODO in future: type inference to figure out type rather than crashing if no type provided
-            match table[parent].1.insert(tid.clone().0, (tid.clone().1.unwrap(), 0, 0, false, (None, None))) {
+            match table[parent].1.insert(tid.clone(), (0, 0, false, (None, None))) {
                 Some(_) => return Err(self.generic_err("Duplicate variables in scope")),
                 _ => ()
             };
@@ -498,68 +476,16 @@ impl Parser {
         // Return
         Ok(stmts)
     }
-    fn typed_ident(&mut self) -> Result<Option<TypedIdent>, String> {
-        // Mark position
-        let pos = self.mark();
-        // Expect an identifier, return none if not found
-        let id = match self.expect(TokenType::Identifier)? {
-            Some((_, TokenValue::String(s), _)) => s.clone(),
-            _ => { self.reset(pos); return Ok(None) }
-        };
-        // Expect a colon
-        let t = match self.expect(TokenType::Colon)? {
-            // Found colon, parse type name
-            Some(_) => {
-                // Expect err an identifier following the colon
-                let t_name = self.parse_type()?;
-                // Some of type name
-                Some(t_name)
-            },
-            // No colon, no type name provided
-            _ => None
-        };
-        // Put together
-        Ok(Some((id, t)))
-    }
-    fn force_typed_ident(&mut self) -> Result<Option<ForceTypedIdent>, String> {
-        // Parse a regular typed ident
-        let tid = self.typed_ident()?;
-        // Check if none or found
-        match tid {
-            Some((s, Some(t))) => Ok(Some((s, t))),
-            Some(_) => Err(self.generic_err("Function definitions must be explicitly type-annotated")),
-            None => Ok(None)
-        }
-    }
-    fn typed_identlist(&mut self) -> Result<TypedIdentList, String> {
+    fn identlist(&mut self) -> Result<IdentList, String> {
         // Identifiers
         let mut idents = Vec::new();
         // Loop
         loop {
             // Attempt to parse an identifier
-            match self.typed_ident()? {
-                Some(tid) => {
+            match self.expect(TokenType::Identifier)? {
+                Some((_, TokenValue::String(tid), _)) => {
                     // Push found identifier string
-                    idents.push(tid);
-                    // Break if no comma
-                    if self.expect(TokenType::Comma)?.is_none() { break }
-                },
-                _ => break
-            };
-        };
-        // Return the list
-        Ok(idents)
-    }
-    fn force_typed_identlist(&mut self) -> Result<ForceTypedIdentList, String> {
-        // Identifiers
-        let mut idents = Vec::new();
-        // Loop
-        loop {
-            // Attempt to parse an identifier
-            match self.force_typed_ident()? {
-                Some(tid) => {
-                    // Push found identifier string
-                    idents.push(tid);
+                    idents.push(tid.clone());
                     // Break if no comma
                     if self.expect(TokenType::Comma)?.is_none() { break }
                 },
@@ -587,20 +513,5 @@ impl Parser {
         };
         // Return the list
         Ok(exprs)
-    }
-    fn parse_type(&mut self) -> Result<Type, String> {
-        // Check for identifier
-        let first = match self.expect(TokenType::Identifier)? {
-            Some((_, TokenValue::String(s), _)) => {
-                match s.as_str() {
-                    "int" => Type::Int,
-                    "flt" => Type::Float,
-                    _ => return Err(self.expected_err("Type"))
-                }
-            },
-            _ => return Err(self.expected_err("Type"))
-        };
-        // Return monotype
-        Ok(first)
     }
 }

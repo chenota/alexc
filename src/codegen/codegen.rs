@@ -4,7 +4,7 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize,Ordering};
 
-pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type, usize)>;
+pub type FunctionTable = HashMap<String, (IdentList, usize)>;
 pub type BasicBlock = (Vec<IRInstruction>, usize);
 
 #[derive(Clone)]
@@ -165,9 +165,9 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             // Check params = args
             if alist.len() != finfo.0.len() { return Err("Invalid function call".to_string()); };
             // Instructions list w/ push instruction for function
-            let mut instrs = vec![ IRInstruction::PushScope(finfo.2) ];
+            let mut instrs = vec![ IRInstruction::PushScope(finfo.1) ];
             // Generate code for parameters, load into parameter slots
-            for ((e, _), (pname, _)) in alist.iter().zip(&finfo.0) {
+            for ((e, _), pname) in alist.iter().zip(&finfo.0) {
                 // Operand to push to call register
                 let operand = match e {
                     ExpressionBody::IntLiteral(sign, magnitude) => {
@@ -190,7 +190,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                 // Declare variable
                 instrs.push(IRInstruction::Declare(pname.clone()));
                 // Move result into variable
-                instrs.push(IRInstruction::Move(operand, Operand::Variable(pname.clone(), Some(finfo.2))))
+                instrs.push(IRInstruction::Move(operand, Operand::Variable(pname.clone(), Some(finfo.1))))
             };
             // Jump to label for function
             instrs.push(IRInstruction::Call(fname.clone()));
@@ -202,7 +202,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                 _ => ()
             };
             // Pop function parameter scope
-            instrs.push(IRInstruction::PopScope(finfo.2));
+            instrs.push(IRInstruction::PopScope(finfo.1));
             // Return list
             return Ok((
                 instrs, 
@@ -255,12 +255,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                     instrs.last_mut().unwrap().0.push(IRInstruction::Return);
                 }
             },
-            StatementBody::LetStmt((id, ty), e) => {
-                // Check that type is an int
-                match ty {
-                    Some(Type::Int) => (),
-                    _ => return Err("Type must be an int".to_string())
-                };
+            StatementBody::LetStmt(id, e) => {
                 // Generate declare instruction
                 instrs.last_mut().unwrap().0.push(IRInstruction::Declare(id.clone()));
                 // Generate instructions for expressions
@@ -376,7 +371,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
     let (funs, mut st) = prog;
     // Construct function table from program
     let mut ft = FunctionTable::new();
-    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), fun.1.1.clone(), st[fun.1.2.1].0)); };
+    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), st[fun.1.2.1].0)); };
     // Blocks vector
     let mut blocks = Vec::new();
     // Loop through functions in the program
@@ -386,7 +381,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
             IRInstruction::Label("_".to_string() + &fun.0),
         ];
         // Generate blocks for that function
-        let mut fun_blocks = basic_blocks(&fun.1.2, &mut st, fun.0 == "start", Some(header), &ft, None)?;
+        let mut fun_blocks = basic_blocks(&fun.1.1, &mut st, fun.0 == "start", Some(header), &ft, None)?;
         // Add blocks to blocks vector
         for block in fun_blocks.drain(..) { blocks.push(block) }
     };
@@ -492,7 +487,7 @@ pub fn st_lookup(ident: &String, table: &SymbolTable, scope: usize) -> Option<us
     // Check if entry exists in current entry
     match table[scope].1.get(ident) {
         // Exists, return current scope if is valid
-        Some((_, _, _, valid, _)) => if *valid {
+        Some((_, _, valid, _)) => if *valid {
             Some(scope)
         } else {
             st_lookup(ident, table, table[scope].0)
@@ -516,13 +511,13 @@ pub fn st_push(scope: usize, st: &mut SymbolTable, offset: usize) -> usize {
         // Add everything from scope
         for (_, x) in &mut st[mscope].1 {
             // Add size to accumulator
-            acc += x.0.byte_size();
+            acc += 8;
             // Add byte offset
-            x.2 = acc + offset;
+            x.1 = acc + offset;
             // Mark scope
-            x.1 = scope;
+            x.0 = scope;
             // Remove memory locations
-            x.4 = (None, None)
+            x.3 = (None, None)
         }
         // Update scope
         mscope = st[mscope].0;
@@ -543,13 +538,13 @@ pub fn st_pop(scope: usize, st: &mut SymbolTable, rt: &mut RegisterTable) -> usi
         // Add everything from scope
         for (_, x) in &mut st[mscope].1 {
             // Add size to accumulator
-            acc += x.0.byte_size();
+            acc += 8;
             // Mark as deallocated
-            x.1 = 0;
+            x.0 = 0;
             // Unmark scope
-            x.3 = false;
+            x.2 = false;
             // Remove memory locations
-            x.4 = (None, None)
+            x.3 = (None, None)
         }
         // Remove all register table references to variables and temporaries in this scope
         for x in rt.iter_mut() {
@@ -580,7 +575,7 @@ pub fn rank_registers(st: &SymbolTable, scope: usize, tt: &TemporaryTable, rt: &
                     // Get scope of variable (should always be in scope)
                     let scope = st_lookup(ident, st, scope).unwrap();
                     // Figure out where value is stored
-                    match st[scope].1.get(ident).unwrap().4.1 {
+                    match st[scope].1.get(ident).unwrap().3.1 {
                         // In memory
                         Some(_) => score += 1,
                         // Not in memory
@@ -620,7 +615,7 @@ pub fn best_register(rankings: &Vec<usize>, restrict: Option<usize>) -> usize {
     best_register.unwrap()
 }
 
-pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
+pub fn ralloc(register: usize, st: &mut SymbolTable, _: usize, tt: &mut TemporaryTable, rt: &mut RegisterTable, stackoffset: &mut usize) -> Vec<X86Instruction> {
     // Instructions needed to perform allocation
     let mut instrs = Vec::new();
     // Check which values this register stores
@@ -629,15 +624,15 @@ pub fn ralloc(register: usize, st: &mut SymbolTable, scope: usize, tt: &mut Temp
         match value {
             RegisterValue::Variable(ident, rscope) => {
                 // Invalidate register entry for variable
-                st.get_mut(*rscope).unwrap().1.get_mut(ident).unwrap().4.0 = None;
+                st.get_mut(*rscope).unwrap().1.get_mut(ident).unwrap().3.0 = None;
                 // Figure out where is stored
-                match st[*rscope].1.get(ident).unwrap().4.1 {
+                match st[*rscope].1.get(ident).unwrap().3.1 {
                     // In memory (don't do anything)
                     Some(_) => (),
                     // Not in memory
                     None => {
                         // Find fixed location of variable in memory
-                        let mem_location = st[*rscope].1.get(ident).unwrap().2;
+                        let mem_location = st[*rscope].1.get(ident).unwrap().1;
                         // Move to location
                         instrs.push(X86Instruction::Move(X86Operand::Register(register), X86Operand::Memory(Box::new(X86Operand::BasePointer), true, mem_location)));
                     }
@@ -697,7 +692,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
     // Check out which scope this variable is in
     let idx = st_lookup(&ident, &st, scope).unwrap();
     // Check location of variable
-    match st[idx].1.get(ident).unwrap().4.0 {
+    match st[idx].1.get(ident).unwrap().3.0 {
         // In a register
         Some(r) => (r, Vec::new()),
         // Not in a register
@@ -710,7 +705,7 @@ fn vselect(ident: &String, st: &mut SymbolTable, scope: usize, tt: &mut Temporar
             let instrs = ralloc(selected_register, st, scope, tt, rt, stackoffset);
             // Update tables
             rt.get_mut(selected_register).unwrap().push(RegisterValue::Variable(ident.clone(), idx));
-            st[idx].1.get_mut(ident).unwrap().4 = (Some(selected_register), None);
+            st[idx].1.get_mut(ident).unwrap().3 = (Some(selected_register), None);
             // Return
             (selected_register, instrs)
         }
@@ -758,7 +753,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Figure out where the variable resides
                         let idx = st_lookup(&ident, st, advance.unwrap_or(bb.1)).unwrap();
                         // Put o1 in a register
-                        let r1 = match st[idx].1.get(&ident).unwrap().4.0 {
+                        let r1 = match st[idx].1.get(&ident).unwrap().3.0 {
                             Some(r) => r,
                             None => {
                                 // Select a register
@@ -776,11 +771,11 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                 // Figure out where the variable resides
                                 let idx2 = st_lookup(&ident2, st, advance.unwrap_or(bb.1)).unwrap();
                                 // Check where o2 lives
-                                match st[idx2].1.get(&ident2).unwrap().4 {
+                                match st[idx2].1.get(&ident2).unwrap().3 {
                                     // In register
                                     (Some(r2), _) => {
                                         // Invalidate memory location
-                                        st[idx2].1.get_mut(&ident2).unwrap().4.1 = None;
+                                        st[idx2].1.get_mut(&ident2).unwrap().3.1 = None;
                                         // Push move instruction
                                         instrs.push(X86Instruction::Move(X86Operand::Register(r1), X86Operand::Register(r2)))
                                     },
@@ -983,7 +978,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
             },
             IRInstruction::Declare(ident) => {
                 // Find variable in most recent scope and mark
-                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().3 = true;
+                st.get_mut(bb.1).unwrap().1.get_mut(&ident).unwrap().2 = true;
             },
             IRInstruction::Jump(label) => {
                 // Push jump instruction
@@ -1021,7 +1016,6 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
             IRInstruction::Return => {
                 instrs.push(X86Instruction::Return)
             }
-            _ => ()
         }
     };
     // Return

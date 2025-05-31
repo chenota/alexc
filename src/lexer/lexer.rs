@@ -68,7 +68,7 @@ fn gen_int(x: &str) -> Option<TokenValue> { Some(TokenValue::Integer(x.parse().u
 fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string())) }
 
 // Constant tokens list
-const TOKENS: [(&str, TokenType, ValueGenerator); 24] = tlist!(
+const TOKENS: [(&str, TokenType, ValueGenerator); 22] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
     r"fun", TokenType::FunKw, gen_empty;
     r"return", TokenType::ReturnKw, gen_empty;
@@ -86,9 +86,7 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 24] = tlist!(
     r"\}", TokenType::RBracket, gen_empty;
     r"=", TokenType::Equal, gen_empty;
     r";", TokenType::Semi, gen_empty;
-    r":", TokenType::Colon, gen_empty;
     r",", TokenType::Comma, gen_empty;
-    r"->", TokenType::Arrow, gen_empty;
     r"[0-9]+", TokenType::Integer, gen_int;
     r"[a-zA-Z][a-zA-Z0-9]*", TokenType::Identifier, gen_id;
     r"[\t\v\f\r ]", TokenType::Whitespace, gen_none;
