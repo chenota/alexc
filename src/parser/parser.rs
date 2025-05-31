@@ -42,7 +42,13 @@ pub enum Bop {
     PlusBop,
     MinusBop,
     TimesBop,
-    DivBop
+    DivBop,
+    EqualBop,
+    NotEqualBop,
+    GtBop,
+    GteBop,
+    LtBop,
+    LteBop
 }
 
 pub type Ident = String;
@@ -52,6 +58,15 @@ pub type StmtList = Vec<Statement>;
 pub type ExprList = Vec<Expression>;
 
 pub type Location = (usize, usize);
+
+const COMPARISON: [(TokenType, Bop); 6] = [
+    (TokenType::Equal, Bop::EqualBop),
+    (TokenType::NotEqual, Bop::NotEqualBop),
+    (TokenType::Gt, Bop::GtBop),
+    (TokenType::Gte, Bop::GteBop),
+    (TokenType::Lt, Bop::LtBop),
+    (TokenType::Lte, Bop::LteBop),
+];
 
 const ARITH_PLUS: [(TokenType, Bop); 2] = [
     (TokenType::Plus, Bop::PlusBop),
@@ -409,12 +424,15 @@ impl Parser {
         )))
     }
     fn expression(&mut self) -> Result<Option<Expression>, String> {
-        self.parse_bop_expr(Self::e1, &ARITH_PLUS)
+        self.parse_bop_expr(Self::e1, &COMPARISON)
     }
     fn e1(&mut self) -> Result<Option<Expression>, String> {
-        self.parse_bop_expr(Self::e2, &ARITH_TIMES)
+        self.parse_bop_expr(Self::e2, &ARITH_PLUS)
     }
     fn e2(&mut self) -> Result<Option<Expression>, String> {
+        self.parse_bop_expr(Self::e3, &ARITH_TIMES)
+    }
+    fn e3(&mut self) -> Result<Option<Expression>, String> {
         // Check for negative sign
         match self.expect(TokenType::Minus)?.cloned() {
             Some((_, _, loc)) => {
@@ -434,10 +452,10 @@ impl Parser {
             },
             None => ()
         };
-        // Parse e3
-        self.e3()
+        // Parse e4
+        self.e4()
     }
-    fn e3(&mut self) -> Result<Option<Expression>, String> {
+    fn e4(&mut self) -> Result<Option<Expression>, String> {
         // Parse value, return none if not found
         let v = match self.value()? {
             Some(v) => v,

@@ -53,10 +53,34 @@ impl ToString for ArithOp {
         }
     }
 }
+
+#[derive(Clone)]
+pub enum CompareOp {
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    Eq,
+    Ne
+}
+impl ToString for CompareOp {
+    fn to_string(&self) -> String {
+        match self {
+            CompareOp::Eq => "sete".to_string(),
+            CompareOp::Lt => "setl".to_string(),
+            CompareOp::Lte => "setle".to_string(),
+            CompareOp::Gt => "setg".to_string(),
+            CompareOp::Gte => "setge".to_string(),
+            CompareOp::Ne => "setne".to_string()
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum IRInstruction {
     Label(String),
     Arithmetic(ArithOp, Operand, Operand),
+    Comparison(CompareOp, Operand, Operand, Operand),
     Move(Operand, Operand),
     Return,
     Exit(Operand),
@@ -84,7 +108,8 @@ impl ToString for IRInstruction {
             IRInstruction::Jump(s) => "jump ".to_string() + s,
             IRInstruction::Declare(s) => "declare ".to_string() + s,
             IRInstruction::Printc(op1) => "printc ".to_string() + &op1.to_string(),
-            IRInstruction::Prints(s) => "prints ".to_string() + "'" + s + "'"
+            IRInstruction::Prints(s) => "prints ".to_string() + "'" + s + "'",
+            IRInstruction::Comparison(op, op1, op2, op3) => op.to_string() + " " + &op1.to_string() + " " + &op2.to_string() + " " + &op3.to_string(),
         }
     }
 }
@@ -92,18 +117,25 @@ impl ToString for IRInstruction {
 pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
+            // Figure out if this is a comparison
+            let is_comparison = match op {
+                Bop::PlusBop | Bop::MinusBop | Bop::TimesBop | Bop::DivBop => false,
+                _ => true
+            };
+            // Allocate space for comparison result
+            let result_space = if is_comparison { 1 } else { 0 };
             // Get expressions out of boxes
             let e1 = &e1b.as_ref().0;
             let e2 = &e2b.as_ref().0;
             // Generate code for first operand
-            let mut op1code = expression_cg(e1, reserved, target, ft)?;
+            let mut op1code = expression_cg(e1, reserved + result_space, target, ft)?;
             // Peek at the next variable, skip codegen if atomic
             let (mut op2inst, op2res, op2rt) = match &e2 {
                 ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), 0, Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
                 ExpressionBody::VariableExpression(s) => (Vec::new(), 0, Operand::Variable(s.clone(), None)),
                 _ => {
                     // Generate code for second operand, keep in mind # of registers reserved by first operation
-                    let op2code = expression_cg(e2, reserved + op1code.1,None, ft)?;
+                    let op2code = expression_cg(e2, reserved + op1code.1 + result_space,None, ft)?;
                     (op2code.0, op2code.1, op2code.2)
                 }
             };
@@ -117,7 +149,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             let moved = op1rt == op2rt;
             if moved {
                 // Register to move op1 into register just past op2
-                let op1reg = Operand::Temporary(reserved + op2res);
+                let op1reg = Operand::Temporary(reserved + op2res + result_space);
                 // Generate move instruction
                 instrs.push(IRInstruction::Move(op1rt, op1reg.clone()));
                 // Switch return address of op1
@@ -131,12 +163,18 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                 Bop::MinusBop => IRInstruction::Arithmetic(ArithOp::Sub, op2rt.clone(), op1rt.clone()),
                 Bop::TimesBop => IRInstruction::Arithmetic(ArithOp::Mul, op2rt.clone(), op1rt.clone()),
                 Bop::DivBop => IRInstruction::Arithmetic(ArithOp::Div, op2rt.clone(), op1rt.clone()),
+                Bop::EqualBop => IRInstruction::Comparison(CompareOp::Eq, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
+                Bop::NotEqualBop => IRInstruction::Comparison(CompareOp::Ne, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
+                Bop::GtBop => IRInstruction::Comparison(CompareOp::Gt, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
+                Bop::GteBop => IRInstruction::Comparison(CompareOp::Gte, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
+                Bop::LtBop => IRInstruction::Comparison(CompareOp::Lt, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
+                Bop::LteBop => IRInstruction::Comparison(CompareOp::Lte, op2rt.clone(), op1rt.clone(), Operand::Temporary(reserved)),
             });
             // If needed to shift registers, shift result to op2's return register
             if moved {
                 instrs.push(IRInstruction::Move(op1rt, op2rt))
             };
-            return Ok((instrs, 1, op1code.2))
+            return Ok((instrs, 1, if is_comparison { Operand::Temporary(reserved) } else { op1code.2 }))
         },
         ExpressionBody::IntLiteral(sign, magnitude) => {
             // Move immediate into register
@@ -485,8 +523,8 @@ pub enum X86Instruction {
     SectionText,
     SectionData,
     CharData,
-    StringData(usize, String)
-
+    StringData(usize, String),
+    SetCmp(CompareOp, X86Operand)
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -507,7 +545,8 @@ impl ToString for X86Instruction {
             X86Instruction::SectionText => "section .text".to_string(),
             X86Instruction::SectionData => "section .data".to_string(),
             X86Instruction::CharData => "__char db 0".to_string(),
-            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + " db \"" + s + "\""
+            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + " db \"" + s + "\"",
+            X86Instruction::SetCmp(op, o1) => op.to_string() + " " + &o1.to_string(),
         }
     }
 }
@@ -954,6 +993,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Return
                         X86Operand::Register(selected_register)
                     },
+                    Operand::Return => X86Operand::Register(0),
                     _ => panic!()
                 };
                 // Restrict registers if need to
@@ -979,20 +1019,87 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Return
                         X86Operand::Register(selected_register)
                     },
-                    Operand::Return => {
-                        // Clear register RAX
-                        if rt[0].len().clone() > 0 {
-                            // Allocate register
-                            for instr in ralloc(0, st, bb.1, &mut tt, rt, stackoffset) { instrs.push(instr) }
-                        }
-                        // Return
-                        X86Operand::Register(0)
-                    }
+                    Operand::Return => X86Operand::Register(0),
                     _ => panic!()
                 };
                 // Push operation instruction
                 instrs.push(X86Instruction::Bop(op, ox1, ox2))
             },
+            IRInstruction::Comparison(op, op1, op2, op3) => {
+                // Figure out first operand
+                let ox1 = match op1 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Immediate(x) => X86Operand::Immediate(x),
+                    Operand::Variable(ident, advance) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = vselect(&ident, st, advance.unwrap_or(bb.1), &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Return => X86Operand::Register(0),
+                    _ => panic!()
+                };
+                // Restrict registers if need to
+                let restrict = match ox1 {
+                    X86Operand::Register(x) => Some(x),
+                    _ => None
+                };
+                // Figure out second operand
+                let ox2 = match op2 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, restrict);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Variable(ident, advance) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = vselect(&ident, st, advance.unwrap_or(bb.1), &mut tt, rt, stackoffset, restrict);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Return => X86Operand::Register(0),
+                    _ => panic!()
+                };
+                // Push compare instruction
+                instrs.push(X86Instruction::Compare(ox1, ox2.clone()));
+                // Figure out second operand
+                let ox3 = match op3 {
+                    Operand::Temporary(x) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = tselect(x, st, bb.1, &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Variable(ident, advance) => {
+                        // Select a temporary register
+                        let (selected_register, tinstrs) = vselect(&ident, st, advance.unwrap_or(bb.1), &mut tt, rt, stackoffset, None);
+                        // Push instrs
+                        for instr in tinstrs { instrs.push(instr) }
+                        // Return
+                        X86Operand::Register(selected_register)
+                    },
+                    Operand::Return => X86Operand::Register(0),
+                    _ => panic!()
+                };
+                // Push set instruction
+                instrs.push(X86Instruction::SetCmp(op, ox3))
+            }
             IRInstruction::PushScope(scope) => {
                 // Figure out space and update symbol table
                 let bytes = st_push(scope, st, *stackoffset);

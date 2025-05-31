@@ -36,7 +36,12 @@ pub enum TokenType {
     EOF,
     BreakKw,
     EmitKw,
-    StringLiteral
+    StringLiteral,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    NotEqual
 }
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -69,7 +74,7 @@ fn gen_id(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x.to_string()
 fn gen_str(x: &str) -> Option<TokenValue> { Some(TokenValue::String(x[1..x.len() - 1].to_string())) }
 
 // Constant tokens list
-const TOKENS: [(&str, TokenType, ValueGenerator); 24] = tlist!(
+const TOKENS: [(&str, TokenType, ValueGenerator); 29] = tlist!(
     r"let", TokenType::LetKw, gen_empty;
     r"fun", TokenType::FunKw, gen_empty;
     r"return", TokenType::ReturnKw, gen_empty;
@@ -87,6 +92,11 @@ const TOKENS: [(&str, TokenType, ValueGenerator); 24] = tlist!(
     r"\{", TokenType::LBracket, gen_empty;
     r"\}", TokenType::RBracket, gen_empty;
     r"=", TokenType::Equal, gen_empty;
+    r"!=", TokenType::NotEqual, gen_empty;
+    r">", TokenType::Gt, gen_empty;
+    r">=", TokenType::Gte, gen_empty;
+    r"<", TokenType::Lt, gen_empty;
+    r"<=", TokenType::Lte, gen_empty;
     r";", TokenType::Semi, gen_empty;
     r",", TokenType::Comma, gen_empty;
     r"[0-9]+", TokenType::Integer, gen_int;
