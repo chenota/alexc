@@ -545,7 +545,7 @@ impl ToString for X86Instruction {
             X86Instruction::SectionText => ".text".to_string(),
             X86Instruction::SectionData => ".data".to_string(),
             X86Instruction::CharData => "__char:\n.byte 0".to_string(),
-            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + ":\n .ascii \"" + s + "\"",
+            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + ":\n.ascii \"" + s + "\"",
             X86Instruction::SetCmp(op, o1) => op.to_string() + " " + &o1.to_string(),
         }
     }
