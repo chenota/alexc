@@ -2,8 +2,6 @@ RUST_SRC := $(wildcard src/*)
 ALEXC     = target/release/alexc
 CC        = gcc
 
-.SECONDARY:
-
 $(ALEXC): $(RUST_SRC)
 	@echo "[cargo] Building $(ALEXC)"
 	cargo build --release > /dev/null

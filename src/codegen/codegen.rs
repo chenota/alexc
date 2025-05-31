@@ -493,7 +493,7 @@ impl ToString for X86Operand {
                 3 => "%rbx".to_string(),
                 4 => "%rsi".to_string(),
                 5 => "%rdi".to_string(),
-                _ => "%".to_string() + &x.to_string()
+                _ => "%r".to_string() + &x.to_string()
             },
             X86Operand::StackPointer => "%rsp".to_string(),
             X86Operand::BasePointer => "%rbp".to_string(),
@@ -501,6 +501,22 @@ impl ToString for X86Operand {
             X86Operand::Memory(op1, sign, mag) => "[".to_string() + &op1.as_ref().to_string() + (if *sign {"-"} else {"+"}) + &mag.to_string() + "]",
             X86Operand::FixedMemory(s) => "[".to_string() + s + "]",
             X86Operand::FixedAddress(s) => "$".to_string() + &s.clone()
+        }
+    }
+}
+impl X86Operand {
+    fn to_byte(&self) -> String {
+        match self {
+            X86Operand::Register(x) => match *x {
+                0 => "%al".to_string(),
+                1 => "%cl".to_string(),
+                2 => "%dl".to_string(),
+                3 => "%bl".to_string(),
+                4 => "%sil".to_string(),
+                5 => "%dil".to_string(),
+                _ => "%r".to_string() + &x.to_string() + "b"
+            },
+            _ => self.to_string()
         }
     }
 }
@@ -524,7 +540,8 @@ pub enum X86Instruction {
     SectionData,
     CharData,
     StringData(usize, String),
-    SetCmp(CompareOp, X86Operand)
+    SetCmp(CompareOp, X86Operand),
+    ZeroExtendByte(X86Operand)
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -546,7 +563,8 @@ impl ToString for X86Instruction {
             X86Instruction::SectionData => ".data".to_string(),
             X86Instruction::CharData => "__char:\n.byte 0".to_string(),
             X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + ":\n.ascii \"" + s + "\"",
-            X86Instruction::SetCmp(op, o1) => op.to_string() + " " + &o1.to_string(),
+            X86Instruction::SetCmp(op, o1) => op.to_string() + " " + &o1.to_byte(),
+            X86Instruction::ZeroExtendByte(o1) => "movzx ".to_string() + &o1.to_byte() + ", " + &o1.to_string()
         }
     }
 }
@@ -1105,7 +1123,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                     _ => panic!()
                 };
                 // Push set instruction
-                instrs.push(X86Instruction::SetCmp(op, ox3))
+                instrs.push(X86Instruction::SetCmp(op, ox3.clone()));
+                // Push zero extend instruction
+                instrs.push(X86Instruction::ZeroExtendByte(ox3))
             }
             IRInstruction::PushScope(scope) => {
                 // Figure out space and update symbol table
@@ -1157,7 +1177,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                     _ => panic!()
                 };
                 // Generate compare instruction
-                instrs.push(X86Instruction::Compare(ox1, X86Operand::Immediate(0)));
+                instrs.push(X86Instruction::Compare(X86Operand::Immediate(0), ox1));
                 // Generate jump instruction
                 instrs.push(X86Instruction::JumpEqual(label));
             },
