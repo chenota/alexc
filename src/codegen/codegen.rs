@@ -481,7 +481,12 @@ pub enum X86Instruction {
     Compare(X86Operand, X86Operand),
     JumpEqual(String),
     Call(String),
-    Return
+    Return,
+    SectionText,
+    SectionData,
+    CharData,
+    StringData(usize, String)
+
 }
 impl ToString for X86Instruction {
     fn to_string(&self) -> String {
@@ -498,7 +503,11 @@ impl ToString for X86Instruction {
             X86Instruction::Compare(o1, o2) => "cmp ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::JumpEqual(x) => "je ".to_string() + x,
             X86Instruction::Call(label) => "call ".to_string() + label,
-            X86Instruction::Return => "ret".to_string()
+            X86Instruction::Return => "ret".to_string(),
+            X86Instruction::SectionText => "section .text".to_string(),
+            X86Instruction::SectionData => "section .data".to_string(),
+            X86Instruction::CharData => "__char db 0".to_string(),
+            X86Instruction::StringData(i, s) => "__data".to_string() + &i.to_string() + " db \"" + s + "\""
         }
     }
 }
@@ -1143,6 +1152,7 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable, dt: DataTable) -> Result<
     // Empty instructions vector
     let mut instrs = vec![
         X86Instruction::Syntax,
+        X86Instruction::SectionText,
         X86Instruction::Global
     ];
     // Empty register table
@@ -1156,6 +1166,14 @@ pub fn ir_to_x86(ir: Vec<BasicBlock>, st: SymbolTable, dt: DataTable) -> Result<
             instrs.push(instr)
         }
     };
+    // Add instructions for data section
+    instrs.push(X86Instruction::SectionData);
+    // Character data
+    instrs.push(X86Instruction::CharData);
+    // Data from dt
+    for entry in dt {
+        instrs.push(X86Instruction::StringData(entry.1, entry.0))
+    }
     // Return
     Ok(instrs)
 }
