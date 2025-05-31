@@ -4,24 +4,22 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize,Ordering};
 
-pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type)>;
+pub type FunctionTable = HashMap<String, (ForceTypedIdentList, Type, usize)>;
 pub type BasicBlock = (Vec<IRInstruction>, usize);
 
 #[derive(Clone)]
 pub enum Operand {
     Temporary(usize),
     Immediate(i32),
-    Variable(String),
-    Parameter(usize),
+    Variable(String, bool), // Name, lag yes or no
     Return
 }
 impl ToString for Operand {
     fn to_string(&self) -> String {
         match self {
             Operand::Temporary(x) => "t".to_string() + &x.to_string(),
-            Operand::Parameter(x) => "p".to_string() + &x.to_string(),
             Operand::Immediate(x) => "#".to_string() + &x.to_string(),
-            Operand::Variable(s) => s.clone(),
+            Operand::Variable(s, lag) => (if *lag { "lag::" } else { "" }).to_string() + &s,
             Operand::Return => "ret".to_string()
         }
     }
@@ -30,10 +28,9 @@ impl PartialEq for Operand {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Operand::Immediate(x), Operand::Immediate(y)) => x == y,
-            (Operand::Parameter(x), Operand::Parameter(y)) => x == y,
             (Operand::Return, Operand::Return) => true,
             (Operand::Temporary(x), Operand::Temporary(y)) => x == y,
-            (Operand::Variable(x), Operand::Variable(y)) => x == y,
+            (Operand::Variable(x, lagx), Operand::Variable(y, lagy)) => x == y && lagx == lagy,
             _ => false
         }
     }
@@ -87,21 +84,21 @@ impl ToString for IRInstruction {
     }
 }
 
-pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, ft: &FunctionTable) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
+pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand>, ft: &FunctionTable, uselag: bool) -> Result<(Vec<IRInstruction>, usize, Operand), String> {
     match e {
         ExpressionBody::BopExpression(op, e1b, e2b) => {
             // Get expressions out of boxes
             let e1 = &e1b.as_ref().0;
             let e2 = &e2b.as_ref().0;
             // Generate code for first operand
-            let mut op1code = expression_cg(e1, reserved, target, ft)?;
+            let mut op1code = expression_cg(e1, reserved, target, ft, uselag)?;
             // Peek at the next variable, skip codegen if atomic
             let (mut op2inst, op2res, op2rt) = match &e2 {
                 ExpressionBody::IntLiteral(sign, magnitude) => (Vec::new(), 0, Operand::Immediate((if *sign {-1} else {1}) * (*magnitude as i32))),
-                ExpressionBody::VariableExpression(s) => (Vec::new(), 0, Operand::Variable(s.clone())),
+                ExpressionBody::VariableExpression(s) => (Vec::new(), 0, Operand::Variable(s.clone(), uselag)),
                 _ => {
                     // Generate code for second operand, keep in mind # of registers reserved by first operation
-                    let op2code = expression_cg(e2, reserved + op1code.1,None, ft)?;
+                    let op2code = expression_cg(e2, reserved + op1code.1,None, ft, uselag)?;
                     (op2code.0, op2code.1, op2code.2)
                 }
             };
@@ -147,17 +144,17 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
         ExpressionBody::VariableExpression(ident) => {
             // Check if has target and is same as variable
             match &target {
-                Some(t) => if *t != Operand::Variable(ident.clone()) {
+                Some(t) => if *t != Operand::Variable(ident.clone(), uselag) {
                     // Load into next available register (mov [sp + offset(ident)] -> tx)
                     return Ok((
-                        vec![IRInstruction::Move(Operand::Variable(ident.clone()), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
+                        vec![IRInstruction::Move(Operand::Variable(ident.clone(), uselag), match &target { Some(t) => t.clone(), _ => Operand::Temporary(reserved) })], 
                         match &target { Some(_) => 0, _ => 1 },
                         match target { Some(t) => t, _ => Operand::Temporary(reserved) }
                     ))
                 },
                 _ => ()
             };
-            return Ok((Vec::new(),0,Operand::Variable(ident.clone())))
+            return Ok((Vec::new(),0,Operand::Variable(ident.clone(), uselag)))
         },
         ExpressionBody::CallExpression(fname, alist) => {
             // Lookup function
@@ -167,10 +164,10 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
             };
             // Check params = args
             if alist.len() != finfo.0.len() { return Err("Invalid function call".to_string()); };
-            // Empty list for instructions
-            let mut instrs = Vec::new();
+            // Instructions list w/ push instruction for function
+            let mut instrs = vec![ IRInstruction::PushScope(finfo.2) ];
             // Generate code for parameters, load into parameter slots
-            for (i, (e, _)) in alist.iter().enumerate() {
+            for ((e, _), (pname, _)) in alist.iter().zip(&finfo.0) {
                 // Operand to push to call register
                 let operand = match e {
                     ExpressionBody::IntLiteral(sign, magnitude) => {
@@ -179,11 +176,11 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     },
                     ExpressionBody::VariableExpression(s) => {
                         // Variable operand
-                        Operand::Variable(s.clone())
+                        Operand::Variable(s.clone(), true)
                     },
                     _ => {
                         // Generate code
-                        let (mut code, _, operand) = expression_cg(e, reserved, None, ft)?;
+                        let (mut code, _, operand) = expression_cg(e, reserved, None, ft, true)?;
                         // Move code to instrs list
                         for instr in code.drain(..) { instrs.push(instr) };
                         // Return operand
@@ -191,7 +188,7 @@ pub fn expression_cg(e: &ExpressionBody, reserved: usize, target: Option<Operand
                     }
                 };
                 // Move result into parameter slot
-                instrs.push(IRInstruction::Move(operand, Operand::Parameter(i)))
+                instrs.push(IRInstruction::Move(operand, Operand::Variable(pname.clone(), false)))
             };
             // Jump to label for function
             instrs.push(IRInstruction::Call(fname.clone()));
@@ -223,8 +220,8 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         Some(v) => v,
         _ => Vec::new()
     }, bl.1));
-    // Push stack
-    instrs.last_mut().unwrap().0.push(IRInstruction::PushScope(bl.1));
+    // Immediately push stack only if main function
+    if main { instrs.last_mut().unwrap().0.push(IRInstruction::PushScope(bl.1)) };
     // Flag to pop stack at very end of block
     let mut fpop: bool = true;
     // Loop through each statement in block
@@ -232,13 +229,13 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
         match &stmt.0 {
             StatementBody::ExprStatement((e, _)) => {
                 // Generate code for expression, extend most recent basic block
-                for x in expression_cg(e, 0, None, ft)?.0.drain(..) {
+                for x in expression_cg(e, 0, None, ft, false)?.0.drain(..) {
                     instrs.last_mut().unwrap().0.push(x)
                 };
             },
             StatementBody::ReturnStatement((e, _)) => {
                 // Generate code for expression
-                let (mut code, _, operand) = expression_cg(e, 0, Some(Operand::Return), ft)?;
+                let (mut code, _, operand) = expression_cg(e, 0, Some(Operand::Return), ft, false)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().0.push(x)
                 };
@@ -263,14 +260,14 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Generate declare instruction
                 instrs.last_mut().unwrap().0.push(IRInstruction::Declare(id.clone()));
                 // Generate instructions for expressions
-                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
+                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone(), false)), ft, false)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().0.push(x);
                 }
             },
             StatementBody::AssignStmt(id, e) => {
                 // Generate instructions for expressions
-                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone())), ft)?;
+                let (mut code, _, _) = expression_cg(&e.0, 0, Some(Operand::Variable(id.clone(), false)), ft, false)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().0.push(x);
                 }
@@ -285,7 +282,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
             },
             StatementBody::IfStmt(e, b1, b2) => {
                 // Generate code for condition
-                let (mut code, _, operand) = expression_cg(&e.0, 0, None, ft)?;
+                let (mut code, _, operand) = expression_cg(&e.0, 0, None, ft, false)?;
                 for x in code.drain(..) {
                     instrs.last_mut().unwrap().0.push(x);
                 }
@@ -339,7 +336,7 @@ pub fn basic_blocks(bl: &Block, st: &mut SymbolTable, main: bool, passthrough: O
                 // Push start label onto the block
                 instrs.last_mut().unwrap().0.push(IRInstruction::Label(loopstart.clone()));
                 // Generate condition checking code
-                let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, ft)?;
+                let (mut cond_instrs, _, operand) = expression_cg(&condition.0, 0, None, ft, false)?;
                 // Push condition code
                 for instr in cond_instrs.drain(..) { instrs.last_mut().unwrap().0.push(instr) }
                 // Jump out of loop if condition is zero
@@ -375,7 +372,7 @@ pub fn program_to_ir(prog: Program) -> Result<(Vec<BasicBlock>, SymbolTable), St
     let (funs, mut st) = prog;
     // Construct function table from program
     let mut ft = FunctionTable::new();
-    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), fun.1.1.clone())); };
+    for fun in &funs { ft.insert(fun.0.clone(), (fun.1.0.clone(), fun.1.1.clone(), fun.1.2.1)); };
     // Blocks vector
     let mut blocks = Vec::new();
     // Loop through functions in the program
@@ -736,9 +733,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                 // Return selected register
                                 X86Operand::Register(selected_register)
                             },
-                            Operand::Variable(ident) => {
+                            Operand::Variable(ident, lag) => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
+                                let (selected_register, tinstrs) = vselect(&ident, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -749,7 +746,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Generate move instruction
                         instrs.push(X86Instruction::Move(X86Operand::Immediate(x), ox2))
                     },
-                    Operand::Variable(ident) => {
+                    Operand::Variable(ident, lag) => {
                         // Figure out where the variable resides
                         let idx = st_lookup(&ident, st, bb.1).unwrap();
                         // Put o1 in a register
@@ -757,7 +754,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                             Some(r) => r,
                             None => {
                                 // Select a register
-                                let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
+                                let (selected_register, tinstrs) = vselect(&ident, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, None);
                                 // Push instrs
                                 for instr in tinstrs { instrs.push(instr) }
                                 // Return selected register
@@ -767,9 +764,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Copy o1's value into o2
                         match o2 {
                             // Check location of other variable
-                            Operand::Variable(ident2) => {
+                            Operand::Variable(ident2, lag) => {
                                 // Figure out where the variable resides
-                                let idx2 = st_lookup(&ident2, st, bb.1).unwrap();
+                                let idx2 = st_lookup(&ident2, st, if lag { st[bb.1].0 } else { bb.1 }).unwrap();
                                 // Check where o2 lives
                                 match st[idx2].1.get(&ident2).unwrap().4 {
                                     // In register
@@ -787,7 +784,7 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                                     // Nowhere
                                     _ => {
                                         // Select a register
-                                        let (r2, tinstrs) = vselect(&ident2, st, bb.1, &mut tt, rt, stackoffset, Some(r1));
+                                        let (r2, tinstrs) = vselect(&ident2, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, Some(r1));
                                         // Push instrs
                                         for instr in tinstrs { instrs.push(instr) }
                                         // Push move instruction
@@ -891,9 +888,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         X86Operand::Register(selected_register)
                     },
                     Operand::Immediate(x) => X86Operand::Immediate(x),
-                    Operand::Variable(ident) => {
+                    Operand::Variable(ident, lag) => {
                         // Select a temporary register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
+                        let (selected_register, tinstrs) = vselect(&ident, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -916,14 +913,14 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Return
                         X86Operand::Register(selected_register)
                     },
-                    Operand::Variable(ident) => {
+                    Operand::Variable(ident, lag) => {
                         // Restrict registers if need to
                         let restrict = match ox1 {
                             X86Operand::Register(x) => Some(x),
                             _ => None
                         };
                         // Select a temporary register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, restrict);
+                        let (selected_register, tinstrs) = vselect(&ident, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, restrict);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return
@@ -973,9 +970,9 @@ pub fn bb_to_x86(bb: BasicBlock, st: &mut SymbolTable, rt: &mut RegisterTable, s
                         // Return selected register
                         X86Operand::Register(selected_register)
                     },
-                    Operand::Variable(ident) => {
+                    Operand::Variable(ident, lag) => {
                         // Select a register
-                        let (selected_register, tinstrs) = vselect(&ident, st, bb.1, &mut tt, rt, stackoffset, None);
+                        let (selected_register, tinstrs) = vselect(&ident, st, if lag { st[bb.1].0 } else { bb.1 }, &mut tt, rt, stackoffset, None);
                         // Push instrs
                         for instr in tinstrs { instrs.push(instr) }
                         // Return selected register
