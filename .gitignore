@@ -28,3 +28,4 @@ Cargo.lock
 *.ac
 *.ir
 *.s
+*.out
