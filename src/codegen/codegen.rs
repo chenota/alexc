@@ -540,7 +540,7 @@ impl ToString for X86Instruction {
             X86Instruction::Jump(x) => "jmp ".to_string() + x,
             X86Instruction::Compare(o1, o2) => "cmp ".to_string() + &o1.to_string() + ", " + &o2.to_string(),
             X86Instruction::JumpEqual(x) => "je ".to_string() + x,
-            X86Instruction::Call(label) => "call ".to_string() + label,
+            X86Instruction::Call(label) => "call _".to_string() + label,
             X86Instruction::Return => "ret".to_string(),
             X86Instruction::SectionText => ".text".to_string(),
             X86Instruction::SectionData => ".data".to_string(),

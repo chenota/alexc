@@ -1,17 +1,18 @@
-# Compiler and tools
+RUST_SRC := $(wildcard src/*)
 ALEXC     = target/release/alexc
 CC        = gcc
 
-# Build rule: make alexc binary if it doesn't already exist
-$(ALEXC):
-	@echo "[cargo] Building $(ALEXC)"
-	cargo build --release
+.SECONDARY:
 
-# Build rule: make <filename> builds <filename>.ac → .s → .out
-%: %.ac
+$(ALEXC): $(RUST_SRC)
+	@echo "[cargo] Building $(ALEXC)"
+	cargo build --release > /dev/null
+
+%.s: %.ac $(ALEXC)
 	@echo "[alexc] Compiling $< to $*.s"
 	$(ALEXC) $< -o $*.s
 
+%: %.s
 	@echo "[gcc] Assembling and Linking $*.s to $*"
 	$(CC) -no-pie -nostartfiles -o $@.out $*.s
 
